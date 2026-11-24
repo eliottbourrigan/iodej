@@ -1,0 +1,56 @@
+{% extends "admin/layout.html" %}
+{% from "macros.html" import resto_visual %}
+{% block main %}
+<div class="stats">
+  <div class="stat pop" style="--d:0; --c:#ff8a1f"><b>{{ stats.restaurants }}</b><span>restos actifs</span></div>
+  <div class="stat pop" style="--d:1; --c:#2fa8ff"><b>{{ stats.collegues }}</b><span>collègues</span></div>
+  <div class="stat pop" style="--d:2; --c:#3ddc84"><b>{{ stats.swipers }}</b><span>swipeurs aujourd'hui</span></div>
+</div>
+
+<section class="panel pop" style="--d:3">
+  <h2 class="h2">Codes d'accès</h2>
+  <div class="code-row" x-data="{ copied: false }">
+    <div>
+      <div class="field-label">Collègues</div>
+      <code class="code">{{ access_code }}</code>
+    </div>
+    <button class="btn btn-sm btn-blue" type="button"
+            @click="navigator.clipboard.writeText('{{ access_code }}'); copied = true; setTimeout(() => copied = false, 1500)"
+            x-text="copied ? 'Copié !' : 'Copier'">Copier</button>
+  </div>
+  <form method="post" action="/admin/codes/access" data-loader
+        onsubmit="return confirm('Générer un nouveau code ? Tous les collègues seront déconnectés.')">
+    <button class="btn btn-sm btn-ghost" type="submit">↻ Régénérer le code collègues</button>
+  </form>
+  <hr class="sep">
+  <div class="code-row">
+    <div>
+      <div class="field-label">Admin</div>
+      <code class="code code-secret" x-data="{ show: false }" @click="show = !show">
+        <span x-show="show" x-cloak>{{ admin_code }}</span><span x-show="!show">•••• voir</span>
+      </code>
+    </div>
+  </div>
+  <form method="post" action="/admin/codes/admin" data-loader
+        onsubmit="return confirm('Générer un nouveau code admin ? Note-le bien !')">
+    <button class="btn btn-sm btn-ghost" type="submit">↻ Régénérer le code admin</button>
+  </form>
+</section>
+
+<section class="panel pop" style="--d:4">
+  <h2 class="h2">Tirage du jour</h2>
+  {% if shortlist %}
+  <div class="mini-grid">
+    {% for r in shortlist %}
+    <div class="mini">{{ resto_visual(r, "thumb") }}<span>{{ r['name'] }}</span></div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="muted">Aucun restaurant actif : ajoute des restos pour lancer le tirage.</p>
+  {% endif %}
+  <form method="post" action="/admin/reset-day" data-loader
+        onsubmit="return confirm('Relancer le tirage ? Les swipes et repas du jour seront effacés.')">
+    <button class="btn btn-sm btn-red" type="submit">🎲 Relancer le tirage du jour</button>
+  </form>
+</section>
+{% endblock %}

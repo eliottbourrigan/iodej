@@ -1,0 +1,28 @@
+{% macro avatar(u, size="md", ring=false) -%}
+<span class="avatar avatar-{{ size }}{% if ring %} avatar-ring{% endif %}" style="--c: {{ color_for(u['id']) }}" title="{{ u['name'] }}">
+  {%- if u['photo'] %}<img src="{{ photo_url(u['photo']) }}" alt="" loading="lazy">{% else %}<b>{{ initials(u['name']) }}</b>{% endif -%}
+</span>
+{%- endmacro %}
+
+{% macro resto_visual(r, cls="") -%}
+<div class="resto-visual {{ cls }}" style="--c: {{ color_for('r' ~ r['id']) }}">
+  {%- if r['photo'] %}<img src="{{ photo_url(r['photo']) }}" alt="" loading="lazy" draggable="false">
+  {%- else %}<span class="resto-emoji">{{ emoji_for(r['id'], r['name']) }}</span>{% endif -%}
+</div>
+{%- endmacro %}
+
+{% macro icon(name) -%}
+{%- if name == "swipe" -%}
+<svg viewBox="0 0 24 24" class="ico"><rect x="7" y="3" width="12" height="16" rx="1.5" transform="rotate(12 13 11)"/><rect x="4" y="5" width="12" height="16" rx="1.5"/></svg>
+{%- elif name == "choix" -%}
+<svg viewBox="0 0 24 24" class="ico"><path d="M12 20.5 3.8 12.6A5 5 0 0 1 12 6.3a5 5 0 0 1 8.2 6.3Z"/></svg>
+{%- elif name == "groupes" -%}
+<svg viewBox="0 0 24 24" class="ico"><circle cx="8" cy="8" r="3.2"/><circle cx="16.5" cy="9" r="2.7"/><path d="M2.5 20c0-3.6 2.5-6 5.5-6s5.5 2.4 5.5 6Z"/><path d="M13.6 20c0-2.6-.6-4.2-1.4-5.2a4.6 4.6 0 0 1 9.3 5.2Z"/></svg>
+{%- elif name == "historique" -%}
+<svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2" fill="none"/></svg>
+{%- elif name == "no" -%}
+<svg viewBox="0 0 24 24" class="ico"><path d="M6 6l12 12M18 6 6 18" fill="none"/></svg>
+{%- elif name == "yes" -%}
+<svg viewBox="0 0 24 24" class="ico"><path d="M12 20.5 3.8 12.6A5 5 0 0 1 12 6.3a5 5 0 0 1 8.2 6.3Z"/></svg>
+{%- endif -%}
+{%- endmacro %}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+  <title>{% block title %}Iodej — On mange où ?{% endblock %}</title>
+  <meta name="theme-color" content="#2f8bff">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Iodej">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ static('icons/icon-192.png') }}">
+  <link rel="apple-touch-icon" href="{{ static('icons/apple-touch-icon.png') }}">
+  <link rel="preload" href="/static/fonts/lilita-one-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ static('css/app.css') }}">
+  <script src="{{ static('vendor/htmx.min.js') }}" defer></script>
+  <script src="{{ static('js/app.js') }}" defer></script>
+  {% block head %}{% endblock %}
+  <script src="{{ static('vendor/alpine.min.js') }}" defer></script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="bg-deco" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  {% block body %}{% endblock %}
+
+  <div id="page-loader" class="page-loader" aria-hidden="true">
+    {% include "partials/spinner.html" %}
+  </div>
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+</body>
+</html>

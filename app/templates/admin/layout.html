@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Backoffice — Iodej{% endblock %}
+{% block body_class %}admin{% endblock %}
+{% block body %}
+<header class="topbar admin-topbar">
+  <a class="logo" href="/admin">IODEJ <small>admin</small></a>
+  <a class="btn btn-sm btn-ghost" href="/admin/logout">Sortir</a>
+</header>
+<nav class="admin-tabs">
+  <a href="/admin" class="{% if section == 'dashboard' %}is-active{% endif %}">Tableau de bord</a>
+  <a href="/admin/restaurants" class="{% if section == 'restaurants' %}is-active{% endif %}">Restos</a>
+  <a href="/admin/collegues" class="{% if section == 'collegues' %}is-active{% endif %}">Collègues</a>
+</nav>
+<main class="screen admin-screen">
+  {% if msg %}<div class="flash pop" x-data x-init="setTimeout(() => $el.classList.add('out'), 4000)">{{ msg }}</div>{% endif %}
+  {% block main %}{% endblock %}
+</main>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block body_class %}login{% endblock %}
+{% block body %}
+<main class="login-screen">
+  <div class="login-hero">
+    <div class="hero-plate" aria-hidden="true"><span>🍔</span><span>🍕</span><span>🍜</span><span>🌮</span></div>
+    <h1 class="title-xl outlined">IODEJ</h1>
+    <p class="ribbon"><span>On mange où ?</span></p>
+  </div>
+
+  <form class="panel login-panel {% if error %}shake{% endif %}" method="post" action="/login" data-loader>
+    {% if users %}
+    <label class="field">
+      <span class="field-label">Qui es-tu ?</span>
+      <select name="user_id" class="input" required>
+        <option value="" disabled {% if not selected %}selected{% endif %}>Choisis ton prénom</option>
+        {% for u in users %}
+        <option value="{{ u['id'] }}" {% if selected == u['id'] %}selected{% endif %}>{{ u['name'] }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">Code d'accès</span>
+      <input class="input input-code" name="code" type="text" inputmode="text" autocomplete="off"
+             autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx" required>
+    </label>
+    {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+    <button class="btn btn-yellow btn-xl" type="submit">C'est parti !</button>
+    {% else %}
+    <p class="empty-note">Aucun collègue pour l'instant.<br>Demande à l'admin de t'ajouter&nbsp;!</p>
+    {% endif %}
+  </form>
+  <a class="login-admin" href="/admin">Backoffice</a>
+</main>
+{% endblock %}

@@ -1,0 +1,6 @@
+{% set going = my_meal == r['id'] %}
+<button class="btn btn-sm {{ 'btn-green' if going else 'btn-yellow' }}{% if going %} is-going{% endif %}"
+        hx-post="/api/meal" hx-vals='{"restaurant_id": {{ r['id'] }}, "tab": "{{ tab_name }}"}'
+        hx-target="#panel" hx-indicator="#panel-loader">
+  {{ "✔ J'y vais" if going else "J'y vais !" }}
+</button>

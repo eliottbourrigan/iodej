@@ -1,0 +1,26 @@
+{% extends "admin/layout.html" %}
+{% from "macros.html" import avatar, resto_visual %}
+{% block main %}
+<div class="admin-head">
+  <h1 class="h1 outlined">{{ ent.label }}</h1>
+  <a class="btn btn-yellow btn-sm" href="/admin/{{ kind }}/new">+ Ajouter</a>
+</div>
+{% if not rows %}
+<section class="panel empty-state pop">
+  <div class="empty-emoji">{{ ent.emoji }}</div>
+  <p>Aucun {{ ent.one }} pour l'instant.</p>
+</section>
+{% endif %}
+<ul class="list">
+  {% for r in rows %}
+  <li class="row-card pop {% if ent.has_active and not r['active'] %}is-dim{% endif %}" style="--d: {{ [loop.index0, 12]|min }}">
+    {% if kind == "restaurants" %}{{ resto_visual(r, "thumb") }}{% else %}{{ avatar(r, "lg") }}{% endif %}
+    <a class="row-main" href="/admin/{{ kind }}/{{ r['id'] }}">
+      <div class="row-title">{{ r['name'] }}{% if ent.has_active and not r['active'] %} <span class="tag">inactif</span>{% endif %}</div>
+      <div class="row-desc">{{ r['description'] or "—" }}</div>
+    </a>
+    <a class="btn btn-sm btn-blue" href="/admin/{{ kind }}/{{ r['id'] }}">Éditer</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

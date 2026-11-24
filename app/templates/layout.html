@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "macros.html" import avatar, icon %}
+{% block body_class %}app{% endblock %}
+{% block body %}
+<header class="topbar">
+  <a class="logo" href="/">IODEJ</a>
+  <div class="topbar-day">{{ human_day(day) }}</div>
+  <div class="menu" x-data="{ open: false }" @click.outside="open = false">
+    <button class="menu-btn" @click="open = !open" aria-label="Menu">{{ avatar(user, "sm") }}</button>
+    <div class="menu-pop" x-show="open" x-transition.scale.origin.top.right x-cloak>
+      <div class="menu-head">{{ avatar(user, "md") }}<strong>{{ user['name'] }}</strong></div>
+      <button class="menu-item" hx-post="/api/swipes/reset"
+              hx-confirm="Recommencer tes swipes du jour ?">↺ Refaire mes swipes</button>
+      <a class="menu-item danger" href="/logout">⏻ Déconnexion</a>
+    </div>
+  </div>
+</header>
+
+<main class="screen">
+  {% block main %}{% endblock %}
+</main>
+
+{% set nav = [("swipe", "Swipe", "/swipe"), ("choix", "Choix", "/resultats?tab=choix"),
+              ("groupes", "Groupes", "/resultats?tab=groupes"), ("historique", "Histo", "/resultats?tab=historique")] %}
+<nav class="tabbar" x-data="{ active: '{{ active }}' }">
+  {% for key, label, href in nav %}
+  <a href="{{ href }}" class="tab tab-{{ key }}" :class="{ 'is-active': active === '{{ key }}' }"
+     {% if partial_nav is defined and key != 'swipe' %}
+     hx-get="/partials/{{ key }}" hx-target="#panel" hx-push-url="{{ href }}" hx-indicator="#panel-loader"
+     @click="active = '{{ key }}'"
+     {% endif %}>
+    <span class="tab-ico">{{ icon(key) }}</span>
+    <span class="tab-label">{{ label }}</span>
+  </a>
+  {% endfor %}
+</nav>
+{% endblock %}

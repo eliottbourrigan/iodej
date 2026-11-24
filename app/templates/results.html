@@ -1,0 +1,9 @@
+{% extends "layout.html" %}
+{% set partial_nav = true %}
+{% block main %}
+<div class="panel-wrap">
+  <div id="panel-loader" class="panel-loader">{% include "partials/spinner.html" %}</div>
+  <div id="panel" hx-get="/partials/{{ tab }}" hx-trigger="load" hx-indicator="#panel-loader">
+  </div>
+</div>
+{% endblock %}

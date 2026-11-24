@@ -1,0 +1,23 @@
+{% from "macros.html" import avatar, resto_visual %}
+<div class="tab-content" hx-get="/partials/choix?refresh=1" hx-trigger="every 20s" hx-target="#panel" hx-indicator=".no-indicator">
+  <h1 class="h1 outlined tab-title">Les choix</h1>
+  {% include "partials/_status.html" %}
+  <ul class="list">
+    {% for r, likers in rows %}
+    <li class="row-card {% if not refresh %}pop{% endif %} {% if not likers %}is-dim{% endif %}" style="--d: {{ loop.index0 }}">
+      {{ resto_visual(r, "thumb") }}
+      <div class="row-main">
+        <div class="row-title">{{ r['name'] }}</div>
+        <div class="avatars">
+          {% for u in likers %}{{ avatar(u, "sm", ring=(u['id'] == user['id'])) }}{% endfor %}
+          {% if not likers %}<span class="muted">Personne…</span>{% endif %}
+        </div>
+      </div>
+      <div class="row-side">
+        <div class="score" style="--c: {{ color_for('r' ~ r['id']) }}">{{ likers|length }}</div>
+        {% if likers %}{% set tab_name = "choix" %}{% include "partials/_meal_btn.html" %}{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>

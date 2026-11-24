@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% from "macros.html" import resto_visual, icon %}
+{% block head %}<script src="{{ static('js/swipe.js') }}" defer></script>{% endblock %}
+{% block main %}
+{% if not shortlist %}
+  <section class="panel empty-state pop">
+    <div class="empty-emoji">🍽️</div>
+    <h2 class="h2">Pas encore de restos&nbsp;!</h2>
+    <p>La base de restaurants est vide. Demande à l'admin d'en ajouter quelques-uns.</p>
+  </section>
+{% else %}
+<div class="swipe-head">
+  <h1 class="h1 outlined">Tu le sens&nbsp;?</h1>
+  <div class="pips" id="pips" style="--n: {{ shortlist|length }}">
+    {% for r in shortlist %}<i class="{% if loop.index0 < done %}on{% endif %}"></i>{% endfor %}
+  </div>
+  <div class="counter"><b id="count-done">{{ done + 1 if done < shortlist|length else done }}</b>/{{ shortlist|length }}</div>
+</div>
+
+<div class="deck" id="deck" data-total="{{ shortlist|length }}" data-done="{{ done }}">
+  {% for r in remaining|reverse %}
+  <article class="card" data-id="{{ r['id'] }}" style="--d: {{ loop.revindex0 }}">
+    {{ resto_visual(r, "card-visual") }}
+    <div class="stamp stamp-yes">MIAM&nbsp;!</div>
+    <div class="stamp stamp-no">BOF</div>
+    <div class="card-body">
+      <h2 class="card-title">{{ r['name'] }}</h2>
+      {% if r['description'] %}<p class="card-desc">{{ r['description'] }}</p>{% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  <div class="deck-done" id="deck-done">
+    <div class="trophy">🏆</div>
+    <h2 class="h1 outlined">Terminé&nbsp;!</h2>
+    <p>On regarde ce que les autres en pensent…</p>
+    {% with label="Calcul des groupes" %}{% include "partials/spinner.html" %}{% endwith %}
+  </div>
+</div>
+
+<div class="swipe-actions">
+  <button class="btn-round btn-no" id="btn-no" aria-label="Non">{{ icon("no") }}</button>
+  <button class="btn-round btn-yes" id="btn-yes" aria-label="Oui">{{ icon("yes") }}</button>
+</div>
+{% endif %}
+{% endblock %}

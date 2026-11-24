@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Backoffice — Iodej{% endblock %}
+{% block body_class %}login admin{% endblock %}
+{% block body %}
+<main class="login-screen">
+  <div class="login-hero">
+    <h1 class="title-xl outlined">IODEJ</h1>
+    <p class="ribbon ribbon-purple"><span>Backoffice</span></p>
+  </div>
+  <form class="panel login-panel {% if error %}shake{% endif %}" method="post" action="/admin/login" data-loader>
+    <label class="field">
+      <span class="field-label">Code admin</span>
+      <input class="input input-code" name="code" type="text" autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx-xxxx" required autofocus>
+    </label>
+    {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+    <button class="btn btn-purple btn-xl" type="submit">Entrer</button>
+  </form>
+  <a class="login-admin" href="/">← Retour à l'appli</a>
+</main>
+{% endblock %}

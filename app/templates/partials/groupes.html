@@ -1,0 +1,36 @@
+{% from "macros.html" import avatar, resto_visual %}
+<div class="tab-content" hx-get="/partials/groupes?refresh=1" hx-trigger="every 20s" hx-target="#panel" hx-indicator=".no-indicator">
+  <h1 class="h1 outlined tab-title">Suggestion</h1>
+  {% include "partials/_status.html" %}
+  {% if not groups %}
+    <section class="panel empty-state {% if not refresh %}pop{% endif %}">
+      <div class="empty-emoji">🤷</div>
+      <h2 class="h2">Aucun match</h2>
+      <p>Personne n'a encore validé de resto aujourd'hui.</p>
+    </section>
+  {% endif %}
+  {% for r, members, mine in groups %}
+  <article class="group-card {% if mine %}is-mine{% endif %} {% if not refresh %}pop{% endif %}" style="--d: {{ loop.index0 }}">
+    {% if mine %}<div class="group-flag">Ton groupe</div>{% endif %}
+    {{ resto_visual(r, "group-visual") }}
+    <div class="group-body">
+      <div class="group-head">
+        <h2 class="h2">{{ r['name'] }}</h2>
+        <span class="group-size">{{ members|length }} <small>pers.</small></span>
+      </div>
+      <div class="group-members">
+        {% for u in members %}
+        <span class="member">{{ avatar(u, "md", ring=(u['id'] == user['id'])) }}<span>{{ u['name'] }}</span></span>
+        {% endfor %}
+      </div>
+      {% set tab_name = "groupes" %}{% include "partials/_meal_btn.html" %}
+    </div>
+  </article>
+  {% endfor %}
+  {% if no_like %}
+  <div class="side-note {% if not refresh %}pop{% endif %}">
+    <b>Rien ne leur plaît&nbsp;:</b>
+    {% for u in no_like %}{{ avatar(u, "xs") }} {{ u['name'] }}{{ ", " if not loop.last }}{% endfor %}
+  </div>
+  {% endif %}
+</div>

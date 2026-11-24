@@ -1,0 +1,61 @@
+{% extends "admin/layout.html" %}
+{% from "macros.html" import avatar, resto_visual %}
+{% block main %}
+{% set d = draft if draft is defined else {} %}
+<div class="admin-head">
+  <a class="btn btn-sm btn-ghost" href="/admin/{{ kind }}">←</a>
+  <h1 class="h1 outlined">{{ row['name'] if row else ent.new }}</h1>
+</div>
+
+<form class="panel form pop {% if error %}shake{% endif %}" method="post" action="/admin/{{ kind }}/save"
+      enctype="multipart/form-data" data-loader
+      x-data="{ preview: null, remove: false }">
+  <input type="hidden" name="item_id" value="{{ row['id'] if row else 0 }}">
+
+  <div class="photo-field">
+    <div class="photo-preview {{ 'is-round' if kind == 'collegues' }}">
+      <template x-if="preview"><img :src="preview" alt=""></template>
+      <template x-if="!preview">
+        <div>
+          {% if row and row['photo'] %}<img src="{{ photo_url(row['photo']) }}" alt="" :class="{ 'is-removed': remove }">
+          {% else %}<span class="photo-placeholder">{{ ent.emoji }}</span>{% endif %}
+        </div>
+      </template>
+    </div>
+    <div class="photo-actions">
+      <label class="btn btn-sm btn-blue">
+        📷 {{ "Changer" if row and row['photo'] else "Ajouter" }} la photo{{ " (facultatif)" if kind == 'collegues' }}
+        <input type="file" name="photo" accept="image/*" hidden
+               @change="const f = $event.target.files[0]; preview = f ? URL.createObjectURL(f) : null; remove = false">
+      </label>
+      {% if row and row['photo'] %}
+      <label class="check"><input type="checkbox" name="remove_photo" value="1" x-model="remove"> Supprimer la photo</label>
+      {% endif %}
+    </div>
+  </div>
+
+  <label class="field">
+    <span class="field-label">Nom</span>
+    <input class="input" name="name" required maxlength="80" value="{{ d.get('name', row['name'] if row else '') }}">
+  </label>
+  <label class="field">
+    <span class="field-label">Description</span>
+    <textarea class="input" name="description" rows="4" maxlength="500">{{ d.get('description', row['description'] if row else '') }}</textarea>
+  </label>
+  {% if ent.has_active %}
+  <label class="check toggle">
+    <input type="checkbox" name="active" value="1" {% if not row or row['active'] %}checked{% endif %}>
+    <span class="toggle-ui"></span> Actif (peut être tiré au sort)
+  </label>
+  {% endif %}
+  {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
+  <button class="btn btn-yellow btn-xl" type="submit">Enregistrer</button>
+</form>
+
+{% if row %}
+<form method="post" action="/admin/{{ kind }}/{{ row['id'] }}/delete" class="danger-zone" data-loader
+      onsubmit="return confirm('Supprimer définitivement ? Son historique sera aussi effacé.')">
+  <button class="btn btn-sm btn-red" type="submit">🗑 Supprimer</button>
+</form>
+{% endif %}
+{% endblock %}

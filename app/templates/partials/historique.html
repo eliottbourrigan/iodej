@@ -1,0 +1,26 @@
+{% from "macros.html" import avatar, resto_visual %}
+<div class="tab-content">
+  <h1 class="h1 outlined tab-title">Historique</h1>
+  <p class="tab-sub">Là où tu as mangé ces 7 derniers jours</p>
+  <ol class="timeline">
+    {% for d, r, mates in history %}
+    <li class="tl-item {% if not r %}is-empty{% endif %} pop" style="--d: {{ loop.index0 }}">
+      <div class="tl-day">{{ human_day(d) }}</div>
+      {% if r %}
+      <div class="row-card">
+        {{ resto_visual(r, "thumb") }}
+        <div class="row-main">
+          <div class="row-title">{{ r['name'] }}</div>
+          <div class="avatars">
+            {% for u in mates %}{{ avatar(u, "xs") }}{% endfor %}
+            {% if not mates %}<span class="muted">En solo</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div class="tl-none">{{ "Pas encore décidé…" if loop.first else "Pas de trace" }}</div>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</div>
