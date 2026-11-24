@@ -1,10 +1,11 @@
 {% from "macros.html" import avatar %}
 <div class="status-bar {% if not refresh %}pop{% endif %}">
-  <div class="status-count"><b>{{ finished|length }}</b>/{{ users_by_id|length }} <span>ont fini</span></div>
-  {% if in_progress or waiting %}
+  <div class="status-count"><b>{{ finished|length }}</b>/{{ present_count }} <span>ont fini</span></div>
+  {% if in_progress or waiting or absent %}
   <div class="status-wait">
     {% for u in in_progress %}<span class="wait-chip is-progress" title="En train de swiper">{{ avatar(u, "xs") }}</span>{% endfor %}
     {% for u in waiting %}<span class="wait-chip" title="Pas encore là">{{ avatar(u, "xs") }}</span>{% endfor %}
+    {% for u, kind in absent %}<span class="wait-chip is-absent" title="{{ u['name'] }} : {{ specials[kind]['name'] }}">{{ avatar(u, "xs") }}<i>{{ emoji_for(0, '', kind) }}</i></span>{% endfor %}
   </div>
   {% endif %}
 </div>

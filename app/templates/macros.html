@@ -7,7 +7,7 @@
 {% macro resto_visual(r, cls="") -%}
 <div class="resto-visual {{ cls }}" style="--c: {{ color_for('r' ~ r['id']) }}">
   {%- if r['photo'] %}<img src="{{ photo_url(r['photo']) }}" alt="" loading="lazy" draggable="false">
-  {%- else %}<span class="resto-emoji">{{ emoji_for(r['id'], r['name']) }}</span>{% endif -%}
+  {%- else %}<span class="resto-emoji">{{ emoji_for(r['id'], r['name'], r['kind']) }}</span>{% endif -%}
 </div>
 {%- endmacro %}
 

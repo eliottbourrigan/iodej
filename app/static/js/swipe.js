@@ -65,8 +65,10 @@
     card.classList.remove("dragging");
     card.classList.add("fly");
     setStamp(card, dir);
-    const dy = fromDrag ? (parseFloat(card.dataset.dy) || 0) : -40;
-    card.style.transform = `translate(${dir * (w + 200)}px, ${dy * 1.5}px) rotate(${dir * 35}deg)`;
+    const dy = fromDrag ? (parseFloat(card.dataset.dy) || 0) : 0;
+    // Au doigt la carte s'incline ; via les boutons elle glisse à plat.
+    const rot = fromDrag ? dir * 25 : 0;
+    card.style.transform = `translate(${dir * (w + 200)}px, ${dy * 1.5}px) rotate(${rot}deg)`;
     setTimeout(() => card.remove(), 500);
 
     const pip = pips[done];
@@ -124,7 +126,7 @@
     const card = topCard();
     if (!card || busy || drag) return;
     setStamp(card, liked ? 1 : -1);
-    card.style.transform = `translateX(${liked ? 30 : -30}px) rotate(${liked ? 4 : -4}deg)`;
+    card.style.transform = `translateX(${liked ? 30 : -30}px)`;
     busy = true;
     setTimeout(() => { busy = false; swipe(card, liked); }, 140);
   };

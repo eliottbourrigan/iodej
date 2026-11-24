@@ -69,7 +69,7 @@ def admin_logout():
 def dashboard(request: Request, msg: str | None = None, conn=Depends(db.get_db), _=Depends(require_admin)):
     day = daily.today()
     stats = {
-        "restaurants": conn.execute("SELECT COUNT(*) FROM restaurants WHERE active = 1").fetchone()[0],
+        "restaurants": conn.execute("SELECT COUNT(*) FROM restaurants WHERE active = 1 AND kind = 'restaurant'").fetchone()[0],
         "collegues": conn.execute("SELECT COUNT(*) FROM users").fetchone()[0],
         "swipers": conn.execute("SELECT COUNT(DISTINCT user_id) FROM swipes WHERE day = ?", (day,)).fetchone()[0],
     }
@@ -114,7 +114,12 @@ def entity_list(request: Request, kind: str, msg: str | None = None, conn=Depend
                 _=Depends(require_admin)):
     ent = _entity(kind)
     rows = conn.execute(f"SELECT * FROM {ent['table']} ORDER BY name COLLATE NOCASE").fetchall()
-    return render(request, "admin/list.html", kind=kind, ent=ent, rows=rows, msg=msg, section=kind)
+    specials = []
+    if kind == "restaurants":
+        specials = [r for r in rows if r["kind"] != "restaurant"]
+        rows = [r for r in rows if r["kind"] == "restaurant"]
+    return render(request, "admin/list.html", kind=kind, ent=ent, rows=rows, specials=specials,
+                  msg=msg, section=kind)
 
 
 @router.get("/{kind}/new")
@@ -166,7 +171,8 @@ async def entity_save(
         photo_name = new_photo
 
     fields = {"name": name, "description": description, "photo": photo_name}
-    if ent["has_active"]:
+    is_special = row is not None and "kind" in row.keys() and row["kind"] != "restaurant"
+    if ent["has_active"] and not is_special:
         fields["active"] = 1 if active else 0
     if row:
         sets = ", ".join(f"{k} = ?" for k in fields)
@@ -184,6 +190,8 @@ async def entity_save(
 def entity_delete(kind: str, item_id: int, conn=Depends(db.get_db), _=Depends(require_admin)):
     ent = _entity(kind)
     row = conn.execute(f"SELECT * FROM {ent['table']} WHERE id = ?", (item_id,)).fetchone()
+    if row and "kind" in row.keys() and row["kind"] != "restaurant":
+        return _back(f"/admin/{kind}", "Les statuts du jour ne peuvent pas être supprimés.")
     if row:
         conn.execute(f"DELETE FROM {ent['table']} WHERE id = ?", (item_id,))
         images.delete(row["photo"])

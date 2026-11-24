@@ -26,6 +26,17 @@ def _swipe_state(conn, user_id: int, day: str):
     return shortlist, swiped, remaining
 
 
+def _my_meal(conn, user_id: int, day: str):
+    return conn.execute(
+        "SELECT r.* FROM meals m JOIN restaurants r ON r.id = m.restaurant_id "
+        "WHERE m.day = ? AND m.user_id = ?", (day, user_id)
+    ).fetchone()
+
+
+def _is_out(meal) -> bool:
+    return meal is not None and meal["kind"] != "restaurant"
+
+
 def _day_overview(conn, day: str):
     """Qui a liké quoi aujourd'hui, et qui a fini de swiper."""
     shortlist = daily.get_shortlist(conn, day)
@@ -40,15 +51,24 @@ def _day_overview(conn, day: str):
         counts[s["user_id"]] = counts.get(s["user_id"], 0) + 1
         if s["liked"]:
             likes.setdefault(s["user_id"], set()).add(s["restaurant_id"])
-    finished = [u for u in users if shortlist and counts.get(u["id"], 0) >= len(shortlist)]
-    in_progress = [u for u in users if 0 < counts.get(u["id"], 0) < len(shortlist)]
-    waiting = [u for u in users if counts.get(u["id"], 0) == 0]
-    meals = {
-        m["user_id"]: m["restaurant_id"]
-        for m in conn.execute("SELECT user_id, restaurant_id FROM meals WHERE day = ?", (day,))
-    }
+    meals, absent = {}, []
+    for m in conn.execute(
+        "SELECT m.user_id, m.restaurant_id, r.kind FROM meals m "
+        "JOIN restaurants r ON r.id = m.restaurant_id WHERE m.day = ?", (day,)
+    ):
+        meals[m["user_id"]] = m["restaurant_id"]
+        if m["kind"] != "restaurant" and m["user_id"] in users_by_id:
+            absent.append((users_by_id[m["user_id"]], m["kind"]))
+    absent_ids = {u["id"] for u, _ in absent}
+    for uid in absent_ids:  # pas là ce midi : exclu des groupes
+        likes.pop(uid, None)
+    present = [u for u in users if u["id"] not in absent_ids]
+    finished = [u for u in present if shortlist and counts.get(u["id"], 0) >= len(shortlist)]
+    in_progress = [u for u in present if 0 < counts.get(u["id"], 0) < len(shortlist)]
+    waiting = [u for u in present if counts.get(u["id"], 0) == 0]
     return dict(shortlist=shortlist, users_by_id=users_by_id, likes=likes, finished=finished,
-                in_progress=in_progress, waiting=waiting, meals=meals)
+                in_progress=in_progress, waiting=waiting, meals=meals, absent=absent,
+                present_count=len(present))
 
 
 # --------------------------------------------------------------------------- auth
@@ -91,8 +111,40 @@ def logout(request: Request):
 
 @router.get("/")
 def home(conn=Depends(db.get_db), user=Depends(require_user)):
-    _, _, remaining = _swipe_state(conn, user["id"], daily.today())
+    day = daily.today()
+    if _my_meal(conn, user["id"], day):
+        return RedirectResponse("/resultats", status_code=303)
+    shortlist, swiped, remaining = _swipe_state(conn, user["id"], day)
+    if not swiped:  # premier passage du jour : « Ce midi, tu… »
+        return RedirectResponse("/ce-midi", status_code=303)
     return RedirectResponse("/swipe" if remaining else "/resultats", status_code=303)
+
+
+@router.get("/ce-midi")
+def today_page(request: Request, conn=Depends(db.get_db), user=Depends(require_user)):
+    day = daily.today()
+    meal = _my_meal(conn, user["id"], day)
+    _, swiped, _ = _swipe_state(conn, user["id"], day)
+    current = meal["kind"] if _is_out(meal) else ("swipe" if swiped or meal else None)
+    return render(request, "today.html", user=user, day=day, current=current,
+                  specials=db.special_rows(conn), active="swipe")
+
+
+@router.post("/api/status")
+def api_status(choice: str = Form(...), conn=Depends(db.get_db), user=Depends(require_user)):
+    day = daily.today()
+    if choice in db.SPECIALS:
+        conn.execute(
+            "INSERT INTO meals(day, user_id, restaurant_id) VALUES (?, ?, ?) "
+            "ON CONFLICT(day, user_id) DO UPDATE SET restaurant_id = excluded.restaurant_id",
+            (day, user["id"], db.special_id(conn, choice)),
+        )
+        return RedirectResponse("/resultats?tab=groupes", status_code=303)
+    # « Je veux swiper ! » : on annule un éventuel statut d'absence.
+    meal = _my_meal(conn, user["id"], day)
+    if _is_out(meal):
+        conn.execute("DELETE FROM meals WHERE day = ? AND user_id = ?", (day, user["id"]))
+    return RedirectResponse("/swipe", status_code=303)
 
 
 @router.get("/swipe")
@@ -135,6 +187,7 @@ def results_page(request: Request, tab: str = "choix", conn=Depends(db.get_db),
                  user=Depends(require_user)):
     tab = tab if tab in TABS else "choix"
     _, _, remaining = _swipe_state(conn, user["id"], daily.today())
+    remaining = [] if _is_out(_my_meal(conn, user["id"], daily.today())) else remaining
     return render(request, "results.html", user=user, tab=tab, tabs=TABS, day=daily.today(),
                   locked=bool(remaining), remaining=len(remaining), active=tab)
 
@@ -151,11 +204,13 @@ def results_partial(request: Request, tab: str, refresh: int = 0, conn=Depends(d
         return render(request, "partials/historique.html", **ctx, history=_history(conn, user["id"]))
 
     _, _, remaining = _swipe_state(conn, user["id"], day)
-    if remaining:
+    my_status = _my_meal(conn, user["id"], day)
+    if remaining and not _is_out(my_status):
         return render(request, "partials/locked.html", **ctx, remaining=len(remaining))
 
     ov = _day_overview(conn, day)
-    ctx.update(ov, my_meal=ov["meals"].get(user["id"]))
+    ctx.update(ov, my_meal=ov["meals"].get(user["id"]),
+               my_status=my_status["kind"] if _is_out(my_status) else None, specials=db.special_rows(conn))
     if tab == "choix":
         rows = []
         for r in ov["shortlist"]:
@@ -189,7 +244,7 @@ def _history(conn, user_id: int):
     for d in days:
         resto = by_day.get(d)
         mates = []
-        if resto:
+        if resto and resto["kind"] == "restaurant":
             mates = conn.execute(
                 "SELECT u.* FROM meals m JOIN users u ON u.id = m.user_id "
                 "WHERE m.day = ? AND m.restaurant_id = ? AND m.user_id != ? ORDER BY u.name",

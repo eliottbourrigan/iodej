@@ -125,7 +125,7 @@ def test_admin_crud(client, conn):
     assert client.get("/admin/collegues/new").status_code == 200
 
     client.post(f"/admin/restaurants/{row['id']}/delete")
-    assert conn.execute("SELECT COUNT(*) FROM restaurants").fetchone()[0] == 0
+    assert conn.execute("SELECT COUNT(*) FROM restaurants WHERE kind = 'restaurant'").fetchone()[0] == 0
 
     bad = client.post("/admin/restaurants/save", data={"name": "X"},
                       files={"photo": ("p.jpg", b"not an image", "image/jpeg")})
@@ -134,3 +134,51 @@ def test_admin_crud(client, conn):
     assert client.get("/admin").status_code == 200
     client.post("/admin/codes/access")
     assert client.get("/admin").status_code == 200
+
+
+def test_home_shows_today_screen_first(client, conn):
+    seed(conn)
+    login(client, conn, 1)
+    assert client.get("/", follow_redirects=False).headers["location"] == "/ce-midi"
+    page = client.get("/ce-midi").text
+    for label in ("télétravail", "gamelle", "chez le client", "Je veux swiper"):
+        assert label in page
+    r = client.post("/api/status", data={"choice": "swipe"}, follow_redirects=False)
+    assert r.headers["location"] == "/swipe"
+
+
+def test_special_status_excluded_from_swipes_and_groups(client, conn):
+    seed(conn, n_restos=3)
+    # Les statuts ne sont jamais tirés au sort
+    ids = daily.get_shortlist_ids(conn)
+    kinds = {r["kind"] for r in conn.execute(
+        f"SELECT kind FROM restaurants WHERE id IN ({','.join('?' * len(ids))})", ids)}
+    assert kinds == {"restaurant"} and len(ids) == 3
+
+    login(client, conn, 2)  # Bob swipe et aime tout
+    for rid in ids:
+        client.post("/api/swipe", data={"restaurant_id": rid, "liked": 1})
+    client.cookies.clear()
+
+    login(client, conn, 1)  # Alice est en télétravail
+    r = client.post("/api/status", data={"choice": "remote"}, follow_redirects=False)
+    assert r.headers["location"].startswith("/resultats")
+    assert client.get("/", follow_redirects=False).headers["location"] == "/resultats"
+    groupes = client.get("/partials/groupes").text  # débloqué sans swiper
+    assert "Pas si vite" not in groupes and "Pas là ce midi" in groupes and "Ton groupe" not in groupes
+    histo = client.get("/partials/historique").text
+    assert "Télétravail" in histo or "télétravail" in histo
+
+    # Changer d'avis : retour au swipe, statut effacé
+    client.post("/api/status", data={"choice": "swipe"})
+    assert conn.execute("SELECT COUNT(*) FROM meals WHERE user_id = 1").fetchone()[0] == 0
+
+
+def test_admin_cannot_delete_specials(client, conn):
+    code = db.get_setting(conn, "admin_code")
+    client.post("/admin/login", data={"code": code})
+    sid = db.special_id(conn, "lunchbox")
+    client.post(f"/admin/restaurants/{sid}/delete")
+    assert conn.execute("SELECT COUNT(*) FROM restaurants WHERE id = ?", (sid,)).fetchone()[0] == 1
+    assert "Statuts du jour" in client.get("/admin/restaurants").text
+    assert client.get(f"/admin/restaurants/{sid}").status_code == 200

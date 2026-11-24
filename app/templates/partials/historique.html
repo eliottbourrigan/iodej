@@ -11,10 +11,12 @@
         {{ resto_visual(r, "thumb") }}
         <div class="row-main">
           <div class="row-title">{{ r['name'] }}</div>
+          {% if r['kind'] == 'restaurant' %}
           <div class="avatars">
             {% for u in mates %}{{ avatar(u, "xs") }}{% endfor %}
             {% if not mates %}<span class="muted">En solo</span>{% endif %}
           </div>
+          {% else %}<div class="row-desc">{{ r['description'] }}</div>{% endif %}
         </div>
       </div>
       {% else %}

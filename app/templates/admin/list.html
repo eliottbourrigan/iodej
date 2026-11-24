@@ -5,6 +5,7 @@
   <h1 class="h1 outlined">{{ ent.label }}</h1>
   <a class="btn btn-yellow btn-sm" href="/admin/{{ kind }}/new">+ Ajouter</a>
 </div>
+{% if kind == "restaurants" %}<p class="tab-sub">Les restos actifs peuvent être tirés au sort.</p>{% endif %}
 {% if not rows %}
 <section class="panel empty-state pop">
   <div class="empty-emoji">{{ ent.emoji }}</div>
@@ -23,4 +24,20 @@
   </li>
   {% endfor %}
 </ul>
+{% if specials %}
+<h2 class="h2 outlined admin-subtitle">Statuts du jour</h2>
+<p class="tab-sub">Proposés sur l'écran « Ce midi », jamais dans les swipes.</p>
+<ul class="list">
+  {% for r in specials %}
+  <li class="row-card pop" style="--d: {{ loop.index0 }}">
+    {{ resto_visual(r, "thumb") }}
+    <a class="row-main" href="/admin/{{ kind }}/{{ r['id'] }}">
+      <div class="row-title">{{ r['name'] }}</div>
+      <div class="row-desc">{{ r['description'] or "—" }}</div>
+    </a>
+    <a class="btn btn-sm btn-blue" href="/admin/{{ kind }}/{{ r['id'] }}">Éditer</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

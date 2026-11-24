@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% from "macros.html" import resto_visual %}
+{% block main %}
+<div class="today">
+  <h1 class="h1 outlined today-title pop">Salut {{ user['name'] }}&nbsp;!</h1>
+  <p class="ribbon pop" style="--d:1"><span>Ce midi, tu…</span></p>
+
+  <form method="post" action="/api/status" class="today-choices" data-loader>
+    {% for kind, r in specials.items() %}
+    <button class="choice choice-{{ kind }} pop {% if current == kind %}is-current{% endif %}"
+            name="choice" value="{{ kind }}" style="--d: {{ loop.index + 1 }}">
+      {{ resto_visual(r, "choice-emoji") }}
+      <span class="choice-label">{{ r['description'] or r['name'] }}</span>
+      {% if current == kind %}<span class="choice-check">✔</span>{% endif %}
+    </button>
+    {% endfor %}
+    <button class="btn btn-green btn-xl choice-swipe pop {% if current == 'swipe' %}is-current{% endif %}"
+            name="choice" value="swipe" style="--d: 5">
+      Je veux swiper&nbsp;!
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -51,7 +51,7 @@ def cmd_rotate(args):
 def cmd_seed(_args):
     db.init()
     conn = db.connect()
-    if conn.execute("SELECT COUNT(*) FROM restaurants").fetchone()[0] == 0:
+    if conn.execute("SELECT COUNT(*) FROM restaurants WHERE kind = 'restaurant'").fetchone()[0] == 0:
         conn.executemany("INSERT INTO restaurants(name, description) VALUES (?, ?)", DEMO_RESTAURANTS)
         print(f"{len(DEMO_RESTAURANTS)} restaurants de démo ajoutés.")
     if conn.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 0:

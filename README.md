@@ -4,6 +4,9 @@ Petite appli entre collègues pour décider où déjeuner, façon Tinder × jeu 
 
 - **Chaque jour**, 10 restaurants sont tirés au sort dans la base (la même liste pour tout le monde).
   Le changement de jour se fait à minuit (fuseau `Europe/Paris` par défaut), vérifié à chaque appel : pas de tâche planifiée.
+- Au premier passage de la journée, écran **« Ce midi, tu… »** : télétravail, gamelle, chez le client, ou « Je veux swiper ! ».
+  Les trois statuts sont stockés comme des restaurants (modifiables dans l'admin, jamais tirés au sort) et apparaissent dans l'historique ;
+  les absents ne comptent pas dans les groupes.
 - Tu **swipes** (glisser ou boutons ✗ / ♥, flèches ← → au clavier).
 - Une fois tes 10 swipes faits, tu débloques :
   - **Choix** — ce que tout le monde a validé, resto par resto ;
@@ -71,6 +74,11 @@ app/
 scripts/          install · update · backup · dev
 tests/            uv run pytest
 ```
+
+### Mises à jour & données
+
+Le schéma évolue par migrations additives et idempotentes au démarrage (`app/db.py`, `_migrate`) :
+les données existantes ne sont jamais écrasées, et `update.sh` fait une sauvegarde avant chaque mise à jour.
 
 ### L'algorithme des groupes
 

@@ -2,6 +2,13 @@
 <div class="tab-content" hx-get="/partials/choix?refresh=1" hx-trigger="every 20s" hx-target="#panel" hx-indicator=".no-indicator">
   <h1 class="h1 outlined tab-title">Les choix</h1>
   {% include "partials/_status.html" %}
+  {% if my_status %}
+  <section class="panel my-status {% if not refresh %}pop{% endif %}">
+    <span class="my-status-emoji">{{ emoji_for(0, '', my_status) }}</span>
+    <div><b>{{ specials[my_status]['description'] or specials[my_status]['name'] }}</b><br><span class="muted">Tu peux quand même rejoindre un resto.</span></div>
+    <a class="btn btn-sm btn-blue" href="/ce-midi">Changer</a>
+  </section>
+  {% endif %}
   <ul class="list">
     {% for r, likers in rows %}
     <li class="row-card {% if not refresh %}pop{% endif %} {% if not likers %}is-dim{% endif %}" style="--d: {{ loop.index0 }}">

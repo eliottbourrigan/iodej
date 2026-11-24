@@ -52,7 +52,10 @@ KEYWORD_EMOJIS = [
 ]
 
 
-def emoji_for(seed, name: str = "") -> str:
+def emoji_for(seed, name: str = "", kind: str = "restaurant") -> str:
+    from .db import SPECIALS
+    if kind in SPECIALS:
+        return SPECIALS[kind][2]
     low = (name or "").lower()
     for keys, emoji in KEYWORD_EMOJIS:
         if any(k in low for k in keys):

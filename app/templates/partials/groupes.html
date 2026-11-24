@@ -2,6 +2,13 @@
 <div class="tab-content" hx-get="/partials/groupes?refresh=1" hx-trigger="every 20s" hx-target="#panel" hx-indicator=".no-indicator">
   <h1 class="h1 outlined tab-title">Suggestion</h1>
   {% include "partials/_status.html" %}
+  {% if my_status %}
+  <section class="panel my-status {% if not refresh %}pop{% endif %}">
+    <span class="my-status-emoji">{{ emoji_for(0, '', my_status) }}</span>
+    <div><b>{{ specials[my_status]['description'] or specials[my_status]['name'] }}</b><br><span class="muted">Tu n'es pas compté dans les groupes.</span></div>
+    <a class="btn btn-sm btn-blue" href="/ce-midi">Changer</a>
+  </section>
+  {% endif %}
   {% if not groups %}
     <section class="panel empty-state {% if not refresh %}pop{% endif %}">
       <div class="empty-emoji">🤷</div>
@@ -27,6 +34,12 @@
     </div>
   </article>
   {% endfor %}
+  {% if absent %}
+  <div class="side-note {% if not refresh %}pop{% endif %}">
+    <b>Pas là ce midi&nbsp;:</b>
+    {% for u, kind in absent %}{{ avatar(u, "xs") }} {{ u['name'] }} {{ emoji_for(0, '', kind) }}{{ ", " if not loop.last }}{% endfor %}
+  </div>
+  {% endif %}
   {% if no_like %}
   <div class="side-note {% if not refresh %}pop{% endif %}">
     <b>Rien ne leur plaît&nbsp;:</b>

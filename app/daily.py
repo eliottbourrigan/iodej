@@ -27,7 +27,7 @@ def get_shortlist_ids(conn, day: str | None = None) -> list[int]:
         row = conn.execute("SELECT restaurant_ids FROM shortlists WHERE day = ?", (day,)).fetchone()
         if row:  # un autre appel l'a créée entre-temps
             return json.loads(row["restaurant_ids"])
-        ids = [r["id"] for r in conn.execute("SELECT id FROM restaurants WHERE active = 1")]
+        ids = [r["id"] for r in conn.execute("SELECT id FROM restaurants WHERE active = 1 AND kind = 'restaurant'")]
         if not ids:
             return []  # rien à tirer : on ne fige pas une liste vide
         picked = random.SystemRandom().sample(ids, min(config.SHORTLIST_SIZE, len(ids)))

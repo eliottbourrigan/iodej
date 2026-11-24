@@ -9,6 +9,7 @@
     <button class="menu-btn" @click="open = !open" aria-label="Menu">{{ avatar(user, "sm") }}</button>
     <div class="menu-pop" x-show="open" x-transition.scale.origin.top.right x-cloak>
       <div class="menu-head">{{ avatar(user, "md") }}<strong>{{ user['name'] }}</strong></div>
+      <a class="menu-item" href="/ce-midi">☀ Mon midi</a>
       <button class="menu-item" hx-post="/api/swipes/reset"
               hx-confirm="Recommencer tes swipes du jour ?">↺ Refaire mes swipes</button>
       <a class="menu-item danger" href="/logout">⏻ Déconnexion</a>

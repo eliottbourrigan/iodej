@@ -47,6 +47,15 @@ CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id, day);
 """
 
 
+# Statuts du jour stockés comme des restaurants (kind != 'restaurant') :
+# ils alimentent l'historique mais ne sont jamais tirés au sort.
+SPECIALS = {
+    "remote": ("Télétravail", "Je suis en télétravail", "🏠"),
+    "lunchbox": ("Gamelle", "J'ai ramené ma gamelle", "🍱"),
+    "client": ("Chez le client", "Je suis chez le client", "💼"),
+}
+
+
 def connect() -> sqlite3.Connection:
     conn = sqlite3.connect(config.DB_PATH, timeout=10, isolation_level=None, check_same_thread=False)
     conn.row_factory = sqlite3.Row
@@ -98,6 +107,7 @@ def init() -> dict[str, str]:
     try:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
+        _migrate(conn)
         if get_setting(conn, "access_code") is None:
             created["access_code"] = codes.generate_code(3)
             set_setting(conn, "access_code", created["access_code"])
@@ -107,3 +117,26 @@ def init() -> dict[str, str]:
     finally:
         conn.close()
     return created
+
+
+def _migrate(conn) -> None:
+    """Migrations additives et idempotentes : aucune donnée existante n'est modifiée."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(restaurants)")}
+    if "kind" not in cols:
+        conn.execute("ALTER TABLE restaurants ADD COLUMN kind TEXT NOT NULL DEFAULT 'restaurant'")
+    for kind, (name, description, _emoji) in SPECIALS.items():
+        if conn.execute("SELECT 1 FROM restaurants WHERE kind = ?", (kind,)).fetchone() is None:
+            conn.execute(
+                "INSERT INTO restaurants(name, description, kind) VALUES (?, ?, ?)",
+                (name, description, kind),
+            )
+
+
+def special_id(conn, kind: str) -> int:
+    return conn.execute("SELECT id FROM restaurants WHERE kind = ?", (kind,)).fetchone()["id"]
+
+
+def special_rows(conn) -> dict:
+    """{kind: ligne restaurants} dans l'ordre de SPECIALS."""
+    rows = {r["kind"]: r for r in conn.execute("SELECT * FROM restaurants WHERE kind != 'restaurant'")}
+    return {k: rows[k] for k in SPECIALS if k in rows}
