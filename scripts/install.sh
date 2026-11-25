@@ -92,7 +92,20 @@ WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
 systemctl enable $SERVICE >/dev/null 2>&1
-systemctl restart $SERVICE
+systemctl stop $SERVICE 2>/dev/null || true
+
+# Le port doit être libre : sinon un autre programme (ex. un ./scripts/dev.sh oublié)
+# répondrait à la place du service et fausserait la vérification.
+port_owner() { ss -Hltnp "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2; }
+for _ in $(seq 1 10); do [[ -z "$(port_owner)" ]] && break; sleep 1; done
+if [[ -n "$(port_owner)" ]]; then
+  PID="$(port_owner)"
+  echo "✖ Le port $PORT est déjà utilisé par un autre programme (pid $PID) :"
+  ps -o pid,user,cmd -p "$PID" | tail -n +2
+  echo "  Arrête-le (kill $PID), ou choisis un autre port avec --port."
+  exit 1
+fi
+systemctl start $SERVICE
 
 if [[ $WITH_CADDY -eq 1 ]]; then
   say "Reverse proxy Caddy"
@@ -139,10 +152,13 @@ for _ in $(seq 1 20); do
   curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break
   sleep 1
 done
-if curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null; then
+LISTENER="$(port_owner)"
+if curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null \
+   && [[ -n "$LISTENER" ]] && grep -q "$SERVICE.service" "/proc/$LISTENER/cgroup" 2>/dev/null; then
   say "C'est en ligne !"
 else
-  echo "⚠ Le service ne répond pas : journalctl -u $SERVICE -n 50"
+  echo "✖ Le service $SERVICE ne répond pas lui-même sur le port $PORT : journalctl -u $SERVICE -n 50"
+  journalctl -u $SERVICE -n 20 --no-pager || true
   exit 1
 fi
 echo "  URL     : ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://<ip-du-vps>}"
