@@ -82,6 +82,7 @@ User=$APP_USER
 WorkingDirectory=$APP_DIR
 Environment=IODEJ_DATA_DIR=$DATA_DIR
 Environment=IODEJ_COOKIE_SECURE=$SECURE
+Environment=IODEJ_VAPID_SUB=${DOMAIN:+https://$DOMAIN}
 Environment=IODEJ_TZ=${IODEJ_TZ:-Europe/Paris}
 ExecStart=$UV run --frozen --no-dev iodej serve --host 127.0.0.1 --port $PORT
 Restart=always
@@ -90,7 +91,42 @@ RestartSec=3
 [Install]
 WantedBy=multi-user.target
 UNIT
+
+say "Rappels du midi (lun→ven 11h30 et 11h55)"
+TZ_NAME="${IODEJ_TZ:-Europe/Paris}"
+VAPID_SUB="mailto:iodej@example.com"; [[ -n "$DOMAIN" ]] && VAPID_SUB="https://$DOMAIN"
+for KIND in first reminder; do
+  [[ $KIND == first ]] && AT="11:30" || AT="11:55"
+  cat > /etc/systemd/system/$SERVICE-notify-$KIND.service <<UNIT
+[Unit]
+Description=$SERVICE : notification « $KIND » du midi
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=$APP_USER
+WorkingDirectory=$APP_DIR
+Environment=IODEJ_DATA_DIR=$DATA_DIR
+Environment=IODEJ_TZ=$TZ_NAME
+Environment=IODEJ_VAPID_SUB=$VAPID_SUB
+ExecStart=$UV run --frozen --no-dev iodej notify $KIND
+UNIT
+  cat > /etc/systemd/system/$SERVICE-notify-$KIND.timer <<UNIT
+[Unit]
+Description=$SERVICE : notification « $KIND » à $AT en semaine
+
+[Timer]
+OnCalendar=Mon..Fri *-*-* $AT:00 $TZ_NAME
+Persistent=false
+
+[Install]
+WantedBy=timers.target
+UNIT
+done
 systemctl daemon-reload
+for KIND in first reminder; do systemctl enable --now $SERVICE-notify-$KIND.timer >/dev/null 2>&1; done
+systemctl list-timers "$SERVICE-notify-*" --no-pager | head -4 || true
+
 systemctl enable $SERVICE >/dev/null 2>&1
 systemctl stop $SERVICE 2>/dev/null || true
 

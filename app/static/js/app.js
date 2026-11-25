@@ -114,6 +114,106 @@
     },
   });
 
+  // ---- Notifications (Web Push) --------------------------------------------
+  const pushSupported = () =>
+    "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+
+  const b64ToBytes = (b64) => {
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+  };
+
+  const postJSON = (url, body) => fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  const currentSubscription = async () => {
+    if (!pushSupported()) return null;
+    const reg = await navigator.serviceWorker.ready;
+    return reg.pushManager.getSubscription();
+  };
+
+  window.pushToggle = () => ({
+    state: "hidden", // hidden | install | denied | off | on
+    busy: false,
+    key: null,
+    async init() {
+      const p = detectPlatform();
+      if (!pushSupported()) {
+        // Sur iPhone, le push n'existe que dans l'appli installée.
+        if (p.os === "ios" && !p.standalone) this.state = "install";
+        return;
+      }
+      if (Notification.permission === "denied") { this.state = "denied"; return; }
+      try {
+        // Clé récupérée d'avance : la demande de permission doit suivre
+        // immédiatement le clic (exigence d'iOS).
+        this.key = (await (await fetch("/api/push/key", { credentials: "same-origin" })).json()).key;
+        const sub = Notification.permission === "granted" ? await currentSubscription() : null;
+        this.state = sub ? "on" : "off";
+        if (sub) postJSON("/api/push/subscribe", sub.toJSON()); // resynchronise l'appareil
+      } catch (_) { this.state = "hidden"; }
+    },
+    label() {
+      if (this.busy) return "⏳ Un instant…";
+      return {
+        install: "🔔 Notifications : installe d'abord l'appli",
+        denied: "🔕 Notifications bloquées (réglages)",
+        off: "🔔 Activer les notifications",
+        on: "🔕 Désactiver les notifications",
+      }[this.state] || "";
+    },
+    async toggle() {
+      if (this.busy) return;
+      this.busy = true;
+      try {
+        if (this.state === "on") {
+          const sub = await currentSubscription();
+          if (sub) {
+            await postJSON("/api/push/unsubscribe", { endpoint: sub.endpoint });
+            await sub.unsubscribe();
+          }
+          this.state = "off";
+          toast("Notifications désactivées");
+        } else {
+          const perm = await Notification.requestPermission();
+          if (perm !== "granted") {
+            this.state = perm === "denied" ? "denied" : "off";
+            toast("Notifications refusées");
+            return;
+          }
+          const reg = await navigator.serviceWorker.ready;
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true, applicationServerKey: b64ToBytes(this.key),
+          });
+          const res = await postJSON("/api/push/subscribe", sub.toJSON());
+          if (!res.ok) throw new Error("subscribe");
+          this.state = "on";
+          toast("🔔 Rappel activé : 11h30 en semaine");
+        }
+      } catch (_) {
+        toast("Impossible d'activer les notifications sur cet appareil");
+      } finally {
+        this.busy = false;
+      }
+    },
+  });
+
+  // À la déconnexion, l'appareil cesse de recevoir les rappels de ce collègue.
+  window.iodejLogout = async () => {
+    showLoader();
+    try {
+      const sub = await Promise.race([currentSubscription(), new Promise((r) => setTimeout(() => r(null), 1500))]);
+      if (sub) {
+        await postJSON("/api/push/unsubscribe", { endpoint: sub.endpoint });
+        await sub.unsubscribe();
+      }
+    } catch (_) { /* on se déconnecte quand même */ }
+    location.href = "/logout";
+  };
+
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }

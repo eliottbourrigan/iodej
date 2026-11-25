@@ -12,7 +12,11 @@
       <a class="menu-item" href="/ce-midi">☀ Mon midi</a>
       <button class="menu-item" hx-post="/api/swipes/reset"
               hx-confirm="Recommencer tes swipes du jour ?">↺ Refaire mes swipes</button>
-      <a class="menu-item danger" href="/logout">⏻ Déconnexion</a>
+      <div x-data="pushToggle()" x-show="state !== 'hidden'" x-cloak>
+        <button class="menu-item" @click="toggle()" :disabled="busy || state === 'denied' || state === 'install'"
+                x-text="label()"></button>
+      </div>
+      <a class="menu-item danger" href="/logout" @click.prevent="iodejLogout()">⏻ Déconnexion</a>
     </div>
   </div>
 </header>

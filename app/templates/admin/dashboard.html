@@ -38,6 +38,15 @@
 </section>
 
 <section class="panel pop" style="--d:4">
+  <h2 class="h2">Notifications</h2>
+  <p><b>{{ stats.push }}</b> appareil{{ "s" if stats.push > 1 }} abonné{{ "s" if stats.push > 1 }}.
+    Rappels du lundi au vendredi à 11h30, puis 11h55 pour ceux qui n'ont encore rien choisi.</p>
+  <form method="post" action="/admin/push/test" data-loader>
+    <button class="btn btn-sm btn-blue" type="submit" {% if not stats.push %}disabled{% endif %}>🔔 Envoyer une notification de test</button>
+  </form>
+</section>
+
+<section class="panel pop" style="--d:5">
   <h2 class="h2">Tirage du jour</h2>
   {% if shortlist %}
   <div class="mini-grid">

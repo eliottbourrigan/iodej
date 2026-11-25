@@ -13,6 +13,9 @@ Petite appli entre collègues pour décider où déjeuner, façon Tinder × jeu 
   - **Groupes** — une répartition qui fait les groupes les plus gros possibles
     (on préfère 2 + 3 à 4 + 1 : personne ne mange seul si on peut l'éviter) ;
   - **Historique** — où tu as mangé ces 7 derniers jours (bouton « J'y vais ! »).
+- **Rappels** (lundi → vendredi) : notification à 11h30 « 🍔 C'est l'heure de choisir ! », relance à 11h55,
+  uniquement pour ceux qui n'ont ni fini leurs swipes ni choisi un resto/statut. Activation depuis le menu de
+  l'avatar (sur iPhone : appli installée sur l'écran d'accueil requise). Envoi : timers systemd → `iodej notify`.
 - **Connexion** : ton prénom + le code d'accès commun, mémorisés en cookie pour toujours. « Déconnexion » efface tous les cookies.
 - **Backoffice** `/admin` (code admin séparé) : CRUD restaurants & collègues avec photo, affichage/régénération des codes, relance du tirage du jour.
 
@@ -48,6 +51,8 @@ Les **codes d'accès** sont générés au premier lancement et affichés à la f
 | Afficher les codes | `uv run iodej codes` |
 | Régénérer le code collègues / admin | `uv run iodej rotate-code access` / `admin` |
 | Relancer le tirage du jour | `uv run iodej reset-day` |
+| Notification de test à tous les appareils abonnés | `uv run iodej notify test` |
+| Prochains rappels programmés | `systemctl list-timers 'iodej-notify-*'` |
 | Logs | `journalctl -u iodej -f` |
 
 ## Déploiement automatique (GitHub Actions)

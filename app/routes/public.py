@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 
-from .. import codes, config, daily, db
+from .. import codes, config, daily, db, push
 from ..auth import clear_all_cookies, optional_user, require_user, set_cookie
 from ..grouping import make_groups
 from ..web import is_htmx, render
@@ -270,3 +270,28 @@ def api_meal(request: Request, restaurant_id: int = Form(...), tab: str = Form("
                 (day, user["id"], restaurant_id),
             )
     return results_partial(request, tab if tab in ("choix", "groupes") else "groupes", 1, conn, user)
+
+
+# --------------------------------------------------------------------------- notifications
+
+@router.get("/api/push/key")
+def api_push_key(conn=Depends(db.get_db), user=Depends(require_user)):
+    return {"key": push.public_key(conn)}
+
+
+@router.post("/api/push/subscribe")
+async def api_push_subscribe(request: Request, conn=Depends(db.get_db), user=Depends(require_user)):
+    sub = await request.json()
+    if not isinstance(sub, dict) or not str(sub.get("endpoint", "")).startswith("https://") \
+            or not isinstance(sub.get("keys"), dict) \
+            or not sub["keys"].get("p256dh") or not sub["keys"].get("auth"):
+        return JSONResponse({"error": "abonnement invalide"}, status_code=400)
+    push.subscribe(conn, user["id"], sub)
+    return {"ok": True}
+
+
+@router.post("/api/push/unsubscribe")
+async def api_push_unsubscribe(request: Request, conn=Depends(db.get_db), user=Depends(require_user)):
+    data = await request.json()
+    push.unsubscribe(conn, str(data.get("endpoint", "")))
+    return {"ok": True}

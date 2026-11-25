@@ -4,7 +4,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import RedirectResponse
 
-from .. import codes, config, daily, db, images
+from .. import codes, config, daily, db, images, push
 from ..auth import is_admin, require_admin, set_cookie
 from ..web import render
 
@@ -72,6 +72,7 @@ def dashboard(request: Request, msg: str | None = None, conn=Depends(db.get_db),
         "restaurants": conn.execute("SELECT COUNT(*) FROM restaurants WHERE active = 1 AND kind = 'restaurant'").fetchone()[0],
         "collegues": conn.execute("SELECT COUNT(*) FROM users").fetchone()[0],
         "swipers": conn.execute("SELECT COUNT(DISTINCT user_id) FROM swipes WHERE day = ?", (day,)).fetchone()[0],
+        "push": conn.execute("SELECT COUNT(*) FROM push_subscriptions").fetchone()[0],
     }
     return render(request, "admin/dashboard.html", msg=msg, stats=stats, day=day,
                   access_code=db.get_setting(conn, "access_code"),
@@ -91,6 +92,14 @@ def rotate_code(which: str, conn=Depends(db.get_db), _=Depends(require_admin)):
         set_cookie(resp, config.ADMIN_COOKIE, codes.fingerprint(new))
         return resp
     return _back("/admin")
+
+
+@router.post("/push/test")
+def push_test(conn=Depends(db.get_db), _=Depends(require_admin)):
+    r = push.send_test(conn)
+    return _back("/admin", f"Notification de test : {r['sent']} envoyée(s) sur {r['recipients']} appareil(s)"
+                           + (f", {r['removed']} abonnement(s) expiré(s) retiré(s)" if r["removed"] else "")
+                           + (f", {r['failed']} échec(s)" if r["failed"] else "") + ".")
 
 
 @router.post("/reset-day")

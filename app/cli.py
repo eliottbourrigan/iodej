@@ -64,6 +64,20 @@ def cmd_seed(_args):
         print(f"{len(DEMO_USERS)} collègues de démo ajoutés.")
 
 
+def cmd_notify(args):
+    import logging
+
+    from . import push
+    logging.basicConfig(level=logging.INFO)
+    db.init()
+    conn = db.connect()
+    if args.kind == "test":
+        result = push.send_test(conn)
+    else:
+        result = push.send_daily(conn, args.kind, force=args.force)
+    print(f"Notifications « {args.kind} » : {result}")
+
+
 def cmd_reset_day(_args):
     db.init()
     daily.reset_day(db.connect())
@@ -89,6 +103,11 @@ def main():
 
     sub.add_parser("seed", help="Ajouter des données de démo (si base vide)").set_defaults(func=cmd_seed)
     sub.add_parser("reset-day", help="Relancer le tirage du jour").set_defaults(func=cmd_reset_day)
+
+    n = sub.add_parser("notify", help="Envoyer les notifications (first = 11h30, reminder = 11h55)")
+    n.add_argument("kind", choices=["first", "reminder", "test"])
+    n.add_argument("--force", action="store_true", help="Envoyer même le week-end")
+    n.set_defaults(func=cmd_notify)
 
     args = p.parse_args()
     args.func(args)

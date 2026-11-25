@@ -42,6 +42,13 @@ CREATE TABLE IF NOT EXISTS meals (
     restaurant_id INTEGER NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
     PRIMARY KEY (day, user_id)
 );
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint   TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE INDEX IF NOT EXISTS idx_swipes_day ON swipes(day);
 CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id, day);
 """
@@ -108,6 +115,8 @@ def init() -> dict[str, str]:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.executescript(SCHEMA)
         _migrate(conn)
+        from . import push  # import local : push dépend de db
+        push.ensure_keys(conn)
         if get_setting(conn, "access_code") is None:
             created["access_code"] = codes.generate_access_code()
             set_setting(conn, "access_code", created["access_code"])
