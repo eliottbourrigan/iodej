@@ -32,6 +32,7 @@ jobs:
 
   deploy:
     needs: test
+    timeout-minutes: 25
     if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-latest
     environment:
@@ -93,6 +94,7 @@ jobs:
 
       - name: Installer / mettre à jour sur le VPS
         if: steps.ssh.outputs.skip != '1'
+        timeout-minutes: 15
         env:
           SSHPASS: ${{ secrets.VPS_PASSWORD }}
           TARGET: ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}
@@ -102,9 +104,10 @@ jobs:
 
       - name: Vérifier que le site répond
         if: steps.ssh.outputs.skip != '1'
+        timeout-minutes: 4
         run: |
-          for i in $(seq 1 30); do
-            if curl -fsS "https://$DOMAIN/healthz"; then echo; echo "✔ https://$DOMAIN est en ligne"; exit 0; fi
+          for i in $(seq 1 12); do
+            if curl -fsS --connect-timeout 5 -m 10 "https://$DOMAIN/healthz"; then echo; echo "✔ https://$DOMAIN est en ligne"; exit 0; fi
             sleep 5
           done
           echo "::warning::Le service tourne mais https://$DOMAIN ne répond pas encore (DNS ou certificat en cours ?)"
