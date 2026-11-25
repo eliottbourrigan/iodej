@@ -19,7 +19,7 @@ Petite appli entre collègues pour décider où déjeuner, façon Tinder × jeu 
 - **Connexion** : ton prénom + le code d'accès commun, mémorisés en cookie pour toujours. « Déconnexion » efface tous les cookies.
 - **Backoffice** `/admin` (code admin séparé) : CRUD restaurants & collègues avec photo, affichage/régénération des codes, relance du tirage du jour.
 
-Stack : FastAPI · Jinja2 · htmx · Alpine.js · SQLite · uv. Aucun build front, tout est servi par le monolithe
+Stack : FastAPI · Jinja2 · htmx · Alpine.js · SQLite · uv — recette complète et réutilisable dans [`stack.md`](stack.md). Aucun build front, tout est servi par le monolithe
 (htmx, Alpine et les polices sont embarqués dans `app/static`, aucun CDN). Installable en PWA.
 
 ## Démarrage local
