@@ -1,0 +1,96 @@
+# Tests puis déploiement sur le VPS à chaque push sur la branche par défaut,
+# ou à la demande (onglet Actions → Deploy → Run workflow).
+#
+# Secrets du dépôt (Settings → Secrets and variables → Actions) :
+#   VPS_HOST        IP du VPS                                  (obligatoire)
+#   VPS_SSH_KEY     clé privée SSH (recommandé)          ┐ l'un
+#   VPS_PASSWORD    mot de passe SSH (à défaut de clé)   ┘ des deux
+#   VPS_USER        utilisateur SSH (défaut : root)            (optionnel)
+#   VPS_PORT        port SSH (défaut : 22)                     (optionnel)
+name: Deploy
+
+on:
+  push:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  DOMAIN: iodej.ebgn.fr
+  APP_PORT: "8000"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run pytest -q
+
+  deploy:
+    needs: test
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://iodej.ebgn.fr
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Préparer SSH
+        id: ssh
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PASSWORD: ${{ secrets.VPS_PASSWORD }}
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "::notice::Secrets VPS_* absents : déploiement ignoré (voir l'en-tête de deploy.yml)."
+            echo "skip=1" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keyscan -p "${VPS_PORT:-22}" -T 15 "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          if [ -n "$VPS_SSH_KEY" ]; then
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+            echo "SSH_CMD=ssh -i $HOME/.ssh/deploy_key -p ${VPS_PORT:-22} -o BatchMode=yes" >> "$GITHUB_ENV"
+          elif [ -n "$VPS_PASSWORD" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            echo "SSH_CMD=sshpass -e ssh -p ${VPS_PORT:-22} -o PreferredAuthentications=password -o PubkeyAuthentication=no" >> "$GITHUB_ENV"
+          else
+            echo "::error::Ajoute le secret VPS_SSH_KEY (ou VPS_PASSWORD)"; exit 1
+          fi
+
+      - name: Envoyer le code
+        if: steps.ssh.outputs.skip != '1'
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+          TARGET: ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}
+        run: |
+          RELEASE="/tmp/iodej-release-${GITHUB_SHA}"
+          echo "RELEASE=$RELEASE" >> "$GITHUB_ENV"
+          rsync -az --delete -e "$SSH_CMD" \
+            --exclude .git --exclude .github --exclude .venv --exclude data --exclude backups \
+            --exclude __pycache__ --exclude .pytest_cache \
+            ./ "$TARGET:$RELEASE/"
+
+      - name: Installer / mettre à jour sur le VPS
+        if: steps.ssh.outputs.skip != '1'
+        env:
+          SSHPASS: ${{ secrets.VPS_PASSWORD }}
+          TARGET: ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}
+        run: |
+          $SSH_CMD "$TARGET" \
+            "SUDO=; [ \$(id -u) -eq 0 ] || SUDO='sudo -n'; \$SUDO bash $RELEASE/scripts/remote-deploy.sh --domain $DOMAIN --port $APP_PORT"
+
+      - name: Vérifier que le site répond
+        if: steps.ssh.outputs.skip != '1'
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS "https://$DOMAIN/healthz"; then echo; echo "✔ https://$DOMAIN est en ligne"; exit 0; fi
+            sleep 5
+          done
+          echo "::warning::Le service tourne mais https://$DOMAIN ne répond pas encore (DNS ou certificat en cours ?)"

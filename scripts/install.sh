@@ -1,21 +1,37 @@
 #!/usr/bin/env bash
-# Installation sur un VPS Ubuntu (Hostinger ou autre), à lancer depuis le dépôt cloné :
+# Installation (ou réinstallation, sans perte de données) sur un VPS Ubuntu,
+# à lancer depuis le dossier du projet :
 #
-#   sudo ./scripts/install.sh                      # HTTP sur le port 80 (IP du VPS)
-#   sudo ./scripts/install.sh --domain dej.example.com   # HTTPS auto (Let's Encrypt via Caddy)
+#   sudo ./scripts/install.sh                                 # HTTP sur le port 80 (IP du VPS)
+#   sudo ./scripts/install.sh --domain iodej.example.fr       # HTTPS auto (Let's Encrypt via Caddy)
 #
-# Options : --domain <nom>  --port <port interne, défaut 8000>  --no-caddy
+# Options :
+#   --domain <nom>     sous-domaine servi en HTTPS
+#   --port <port>      port interne (défaut 8000) — un port différent par projet
+#   --data-dir <dir>   base + photos (défaut : <projet>/data)
+#   --service <nom>    nom du service systemd et du site Caddy (défaut : iodej)
+#   --no-caddy         ne pas toucher à Caddy
+#   --skip-system      ne pas lancer apt (déploiements suivants, plus rapide)
+#
+# Plusieurs projets cohabitent : chacun dépose /etc/caddy/sites/<service>.caddy,
+# que le Caddyfile principal importe.
 set -euo pipefail
 
 DOMAIN=""
 PORT=8000
+DATA_DIR=""
+SERVICE=iodej
 WITH_CADDY=1
+SKIP_SYSTEM=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
     --port) PORT="$2"; shift 2 ;;
+    --data-dir) DATA_DIR="$2"; shift 2 ;;
+    --service) SERVICE="$2"; shift 2 ;;
     --no-caddy) WITH_CADDY=0; shift ;;
-    -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+    --skip-system) SKIP_SYSTEM=1; shift ;;
+    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
     *) echo "Option inconnue : $1"; exit 1 ;;
   esac
 done
@@ -25,13 +41,16 @@ done
 APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_USER="$(stat -c %U "$APP_DIR")"
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
-SERVICE=iodej
+DATA_DIR="${DATA_DIR:-$APP_DIR/data}"
 
 say() { printf '\n\033[1;35m▶ %s\033[0m\n' "$*"; }
+as_app() { sudo -u "$APP_USER" -H env IODEJ_DATA_DIR="$DATA_DIR" bash -c "$1"; }
 
-say "Paquets système"
-apt-get update -qq
-apt-get install -y -qq curl git ca-certificates >/dev/null
+if [[ $SKIP_SYSTEM -eq 0 ]]; then
+  say "Paquets système"
+  apt-get update -qq
+  apt-get install -y -qq curl git rsync ca-certificates >/dev/null
+fi
 
 say "uv (gestionnaire Python) pour l'utilisateur $APP_USER"
 UV="$APP_HOME/.local/bin/uv"
@@ -41,22 +60,27 @@ fi
 "$UV" --version
 
 say "Dépendances Python"
-sudo -u "$APP_USER" -H bash -c "cd '$APP_DIR' && '$UV' sync --frozen --no-dev"
+as_app "cd '$APP_DIR' && '$UV' sync --frozen --no-dev"
 
-say "Base de données & codes d'accès"
-sudo -u "$APP_USER" -H bash -c "cd '$APP_DIR' && '$UV' run --frozen --no-dev iodej codes"
+say "Base de données & codes d'accès ($DATA_DIR)"
+mkdir -p "$DATA_DIR"
+chown "$APP_USER": "$DATA_DIR"
+as_app "cd '$APP_DIR' && '$UV' run --frozen --no-dev iodej init"
+# Les codes ne sont affichés qu'en session interactive (jamais dans les logs de CI).
+if [[ -t 1 ]]; then as_app "cd '$APP_DIR' && '$UV' run --frozen --no-dev iodej codes"; fi
 
 say "Service systemd ($SERVICE)"
 SECURE=0; [[ -n "$DOMAIN" ]] && SECURE=1
 cat > /etc/systemd/system/$SERVICE.service <<UNIT
 [Unit]
-Description=Iodej — On mange où ?
+Description=$SERVICE (Iodej — On mange où ?)
 After=network.target
 
 [Service]
 Type=simple
 User=$APP_USER
 WorkingDirectory=$APP_DIR
+Environment=IODEJ_DATA_DIR=$DATA_DIR
 Environment=IODEJ_COOKIE_SECURE=$SECURE
 Environment=IODEJ_TZ=${IODEJ_TZ:-Europe/Paris}
 ExecStart=$UV run --frozen --no-dev iodej serve --host 127.0.0.1 --port $PORT
@@ -67,7 +91,7 @@ RestartSec=3
 WantedBy=multi-user.target
 UNIT
 systemctl daemon-reload
-systemctl enable --now $SERVICE
+systemctl enable $SERVICE >/dev/null 2>&1
 systemctl restart $SERVICE
 
 if [[ $WITH_CADDY -eq 1 ]]; then
@@ -80,28 +104,47 @@ if [[ $WITH_CADDY -eq 1 ]]; then
       > /etc/apt/sources.list.d/caddy-stable.list
     apt-get update -qq && apt-get install -y -qq caddy >/dev/null
   fi
+
+  # Caddyfile principal = une simple liste d'imports, un fichier par site.
+  mkdir -p /etc/caddy/sites
+  MAIN=/etc/caddy/Caddyfile
+  if ! grep -qs "import sites/\*" "$MAIN"; then
+    if [[ ! -s "$MAIN" ]] || grep -qs "/usr/share/caddy" "$MAIN" \
+       || { grep -qs "reverse_proxy 127.0.0.1:$PORT" "$MAIN" && [[ $(grep -c '{' "$MAIN") -le 1 ]]; }; then
+      # Fichier par défaut du paquet, ou généré par une ancienne version de ce script.
+      [[ -s "$MAIN" ]] && cp "$MAIN" "$MAIN.bak-$(date +%Y%m%d%H%M%S)"
+      echo "import sites/*.caddy" > "$MAIN"
+    else
+      echo "⚠ Caddyfile personnalisé détecté : ajout de l'import à la fin (vérifie qu'il n'y a pas de doublon)."
+      printf '\nimport sites/*.caddy\n' >> "$MAIN"
+    fi
+  fi
+
   SITE="${DOMAIN:-:80}"
-  cat > /etc/caddy/Caddyfile <<CADDY
+  cat > /etc/caddy/sites/$SERVICE.caddy <<CADDY
 $SITE {
     encode zstd gzip
     reverse_proxy 127.0.0.1:$PORT
 }
 CADDY
-  systemctl enable caddy >/dev/null
+  caddy validate --config "$MAIN" --adapter caddyfile >/dev/null
+  systemctl enable caddy >/dev/null 2>&1
   systemctl reload caddy || systemctl restart caddy
   if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
     ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
   fi
 fi
 
-sleep 2
+for _ in $(seq 1 20); do
+  curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break
+  sleep 1
+done
 if curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null; then
   say "C'est en ligne !"
 else
-  echo "⚠ Le service ne répond pas encore : journalctl -u $SERVICE -n 50"
+  echo "⚠ Le service ne répond pas : journalctl -u $SERVICE -n 50"
+  exit 1
 fi
-IP="$(curl -fs https://api.ipify.org 2>/dev/null || hostname -I | awk '{print $1}')"
-echo "  URL     : ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://$IP}"
+echo "  URL     : ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://<ip-du-vps>}"
 echo "  Admin   : …/admin"
-echo "  Codes   : sudo -u $APP_USER $UV run iodej codes   (depuis $APP_DIR)"
 echo "  Logs    : journalctl -u $SERVICE -f"

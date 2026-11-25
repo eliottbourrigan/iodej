@@ -32,6 +32,11 @@ def cmd_serve(args):
                 proxy_headers=True, forwarded_allow_ips="*")
 
 
+def cmd_init(_args):
+    created = db.init()
+    print("Base prête" + (" (codes d'accès générés : `iodej codes` pour les voir)." if created else "."))
+
+
 def cmd_codes(_args):
     db.init()
     conn = db.connect()
@@ -75,6 +80,7 @@ def main():
     s.add_argument("--reload", action="store_true", help="Rechargement auto (dev)")
     s.set_defaults(func=cmd_serve)
 
+    sub.add_parser("init", help="Créer / migrer la base sans rien afficher de sensible").set_defaults(func=cmd_init)
     sub.add_parser("codes", help="Afficher les codes d'accès").set_defaults(func=cmd_codes)
 
     r = sub.add_parser("rotate-code", help="Régénérer un code")

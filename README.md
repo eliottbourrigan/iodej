@@ -50,6 +50,27 @@ Les **codes d'accès** sont générés au premier lancement et affichés à la f
 | Relancer le tirage du jour | `uv run iodej reset-day` |
 | Logs | `journalctl -u iodej -f` |
 
+## Déploiement automatique (GitHub Actions)
+
+`.github/workflows/deploy.yml` lance les tests puis déploie sur **https://iodej.ebgn.fr** à chaque push
+sur la branche par défaut (ou via *Actions → Deploy → Run workflow*).
+
+1. DNS : enregistrement `A` `iodej` (ou `*` pour tous les futurs projets) → IP du VPS.
+2. Secrets du dépôt (*Settings → Secrets and variables → Actions*) : `VPS_HOST`, et `VPS_SSH_KEY`
+   (recommandé) ou `VPS_PASSWORD`. Optionnels : `VPS_USER` (défaut `root`), `VPS_PORT`.
+3. Côté VPS, rien à préparer : le premier déploiement crée l'utilisateur `iodej`, installe tout
+   (`/home/iodej/app` pour le code, `/home/iodej/data` pour les données, jamais écrasées) et reprend
+   les données d'une éventuelle installation manuelle précédente.
+
+Codes d'accès (jamais affichés dans les logs de CI), sur le VPS :
+
+```bash
+sudo -u iodej -H bash -c 'cd ~/app && IODEJ_DATA_DIR=~/data ~/.local/bin/uv run iodej codes'
+```
+
+Plusieurs projets sur le même VPS : chaque projet dépose `/etc/caddy/sites/<projet>.caddy`
+(importé par le Caddyfile principal) et écoute sur son propre port.
+
 ## Configuration (variables d'environnement, toutes optionnelles)
 
 | Variable | Défaut | Rôle |

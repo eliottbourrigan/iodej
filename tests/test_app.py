@@ -182,3 +182,8 @@ def test_admin_cannot_delete_specials(client, conn):
     assert conn.execute("SELECT COUNT(*) FROM restaurants WHERE id = ?", (sid,)).fetchone()[0] == 1
     assert "Statuts du jour" in client.get("/admin/restaurants").text
     assert client.get(f"/admin/restaurants/{sid}").status_code == 200
+
+
+def test_not_indexed(client):
+    assert "Disallow: /" in client.get("/robots.txt").text
+    assert client.get("/login").headers["X-Robots-Tag"].startswith("noindex")

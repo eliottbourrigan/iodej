@@ -2,7 +2,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config, db
@@ -27,6 +27,19 @@ app.mount("/static", StaticFiles(directory=config.BASE_DIR / "static"), name="st
 app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")
 app.include_router(public.router)
 app.include_router(admin.router)
+
+
+@app.middleware("http")
+async def no_index(request: Request, call_next):
+    # Appli interne : on demande aux moteurs de recherche de ne rien indexer.
+    response = await call_next(request)
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots():
+    return PlainTextResponse("User-agent: *\nDisallow: /\n")
 
 
 @app.exception_handler(LoginRequired)
