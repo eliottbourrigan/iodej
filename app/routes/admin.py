@@ -82,10 +82,10 @@ def dashboard(request: Request, msg: str | None = None, conn=Depends(db.get_db),
 @router.post("/codes/{which}")
 def rotate_code(which: str, conn=Depends(db.get_db), _=Depends(require_admin)):
     if which == "access":
-        db.set_setting(conn, "access_code", codes.generate_code(3))
+        db.set_setting(conn, "access_code", codes.generate_access_code())
         return _back("/admin", "Nouveau code collègues généré : tout le monde doit se reconnecter.")
     if which == "admin":
-        new = codes.generate_code(4)
+        new = codes.generate_admin_code()
         db.set_setting(conn, "admin_code", new)
         resp = _back("/admin", "Nouveau code admin généré.")
         set_cookie(resp, config.ADMIN_COOKIE, codes.fingerprint(new))

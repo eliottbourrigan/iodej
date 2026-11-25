@@ -21,8 +21,9 @@
     </label>
     <label class="field">
       <span class="field-label">Code d'accès</span>
-      <input class="input input-code" name="code" type="text" inputmode="text" autocomplete="off"
-             autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="xxxx-xxxx-xxxx" required>
+      <input class="input input-code input-code-short" name="code" type="text" inputmode="text" autocomplete="off"
+             autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABC123"
+             maxlength="20" required>
     </label>
     {% if error %}<p class="form-error">{{ error }}</p>{% endif %}
     <button class="btn btn-yellow btn-xl" type="submit">C'est parti !</button>

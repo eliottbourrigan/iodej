@@ -130,6 +130,8 @@ select.input {
 }
 .input:focus { box-shadow: inset 0 4px 0 rgba(26,18,56,.08), 0 0 0 4px var(--yellow); }
 .input-code { font-family: ui-monospace, "SF Mono", Menlo, monospace; letter-spacing: 2px; text-align: center; }
+.input-code-short { font-size: 1.7rem; letter-spacing: 8px; text-transform: uppercase; padding: 10px; }
+.input-code-short::placeholder { letter-spacing: 8px; opacity: .3; }
 textarea.input { resize: vertical; }
 .form-error { color: var(--red-d); font-weight: 900; margin: -4px 0 14px; }
 .check { display: flex; align-items: center; gap: 8px; font-weight: 800; cursor: pointer; }

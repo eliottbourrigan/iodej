@@ -93,7 +93,7 @@ def test_logout_clears_cookies(client, conn):
 def test_access_code_rotation_logs_out(client, conn):
     seed(conn)
     login(client, conn, 1)
-    db.set_setting(conn, "access_code", codes.generate_code())
+    db.set_setting(conn, "access_code", codes.generate_access_code())
     assert client.get("/swipe", follow_redirects=False).headers["location"] == "/login"
 
 
@@ -187,3 +187,18 @@ def test_admin_cannot_delete_specials(client, conn):
 def test_not_indexed(client):
     assert "Disallow: /" in client.get("/robots.txt").text
     assert client.get("/login").headers["X-Robots-Tag"].startswith("noindex")
+
+
+def test_access_code_format_and_case_insensitive(client, conn):
+    import re
+    for _ in range(50):
+        assert re.fullmatch(r"[A-HJKMNP-Z2-9]{6}", codes.generate_access_code())
+    db.set_setting(conn, "access_code", "K7M2PX")
+    seed(conn)
+    r = client.post("/login", data={"user_id": 1, "code": " k7m2px "}, follow_redirects=False)
+    assert r.status_code == 303
+
+
+def test_new_install_gets_short_access_code(conn):
+    import re
+    assert re.fullmatch(r"[A-Z0-9]{6}", db.get_setting(conn, "access_code"))

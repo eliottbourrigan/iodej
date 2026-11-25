@@ -1,9 +1,23 @@
-"""Génération des codes d'accès (lisibles sur mobile, ~60 bits d'entropie)."""
+"""Génération des codes d'accès.
+
+- collègues : 6 caractères, majuscules et chiffres, faciles à taper et à dicter ;
+- admin : plus long (~80 bits), il protège le backoffice.
+"""
 import hashlib
 import secrets
 
-# Pas de caractères ambigus (0/o, 1/l/i).
+# Pas de caractères ambigus (0/O, 1/I/L).
+ACCESS_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+ACCESS_LENGTH = 6
 ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
+
+
+def generate_access_code() -> str:
+    return "".join(secrets.choice(ACCESS_ALPHABET) for _ in range(ACCESS_LENGTH))
+
+
+def generate_admin_code() -> str:
+    return generate_code(4)
 
 
 def generate_code(groups: int = 3, size: int = 4) -> str:

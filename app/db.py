@@ -109,10 +109,10 @@ def init() -> dict[str, str]:
         conn.executescript(SCHEMA)
         _migrate(conn)
         if get_setting(conn, "access_code") is None:
-            created["access_code"] = codes.generate_code(3)
+            created["access_code"] = codes.generate_access_code()
             set_setting(conn, "access_code", created["access_code"])
         if get_setting(conn, "admin_code") is None:
-            created["admin_code"] = codes.generate_code(4)
+            created["admin_code"] = codes.generate_admin_code()
             set_setting(conn, "admin_code", created["admin_code"])
     finally:
         conn.close()

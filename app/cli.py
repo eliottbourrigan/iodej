@@ -48,7 +48,7 @@ def cmd_rotate(args):
     db.init()
     conn = db.connect()
     key = "access_code" if args.which == "access" else "admin_code"
-    value = codes.generate_code(3 if args.which == "access" else 4)
+    value = codes.generate_access_code() if args.which == "access" else codes.generate_admin_code()
     db.set_setting(conn, key, value)
     print(f"Nouveau code {'collègues' if args.which == 'access' else 'admin'} : {value}")
 
