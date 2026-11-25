@@ -35,4 +35,41 @@
   </a>
   {% endfor %}
 </nav>
+
+{# Aide à l'installation en PWA : mobile uniquement, hors appli installée. #}
+<aside class="pwa-hint" x-data="pwaHint()" x-show="open" x-cloak>
+  <button class="pwa-close" @click="dismiss()" aria-label="Plus tard">✕</button>
+  <div class="pwa-head">
+    <img src="{{ static('icons/icon-192.png') }}" alt="" class="pwa-icon">
+    <div>
+      <strong>Installe IODEJ&nbsp;!</strong>
+      <span>Une vraie appli sur ton écran d'accueil, en plein écran.</span>
+    </div>
+  </div>
+
+  <template x-if="os === 'android' && canPrompt">
+    <button class="btn btn-green btn-xl pwa-cta" @click="install()">Installer l'appli</button>
+  </template>
+
+  <template x-if="os === 'android' && !canPrompt">
+    <ol class="pwa-steps">
+      <li>Touche le menu <b class="pwa-key">⋮</b> en haut à droite de Chrome</li>
+      <li>Choisis <b>« Ajouter à l'écran d'accueil »</b> puis <b>« Installer »</b></li>
+    </ol>
+  </template>
+
+  <template x-if="os === 'ios'">
+    <ol class="pwa-steps">
+      <li>Touche <b>Partager</b>
+        <svg class="pwa-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" fill="none"/><path d="M8 10H5.5v10.5h13V10H16" fill="none"/></svg>
+        <span x-text="safari ? 'en bas de l\'écran' : 'dans la barre d\'adresse'"></span>
+      </li>
+      <li>Fais défiler puis choisis <b>« Sur l'écran d'accueil »</b>
+        <svg class="pwa-share" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" fill="none"/><path d="M12 8v8M8 12h8" fill="none"/></svg>
+      </li>
+    </ol>
+  </template>
+
+  <button class="pwa-later" @click="dismiss()">Plus tard</button>
+</aside>
 {% endblock %}

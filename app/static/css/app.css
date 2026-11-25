@@ -358,6 +358,27 @@ textarea.input { resize: vertical; }
 .wait-chip.is-absent { position: relative; opacity: .8; filter: none; }
 .wait-chip.is-absent i { position: absolute; right: -5px; bottom: -4px; font-style: normal; font-size: .7rem; }
 
+/* ---------------------------------------------------------------- aide PWA */
+.pwa-hint {
+  position: fixed; left: 10px; right: 10px; z-index: 40; max-width: 520px; margin: 0 auto;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 10px);
+  background: var(--paper); border: var(--bw) solid var(--ink); border-radius: var(--r);
+  box-shadow: 0 6px 0 var(--ink), 0 18px 40px rgba(26,18,56,.45); padding: 14px 14px 10px;
+}
+.pwa-hint { animation: slide-up .45s cubic-bezier(.3,1.4,.5,1) both; }
+.pwa-close { position: absolute; top: 6px; right: 8px; background: none; border: 0; font-size: 1.1rem; font-weight: 900; cursor: pointer; padding: 6px; color: var(--ink-soft); }
+.pwa-head { display: flex; align-items: center; gap: 12px; padding-right: 22px; margin-bottom: 10px; }
+.pwa-head strong { display: block; font-family: var(--font-game); font-weight: 400; font-size: 1.3rem; }
+.pwa-head span { font-weight: 700; font-size: .9rem; color: var(--ink-soft); }
+.pwa-icon { width: 52px; height: 52px; flex: none; border: var(--bw) solid var(--ink); border-radius: 10px; }
+.pwa-steps { margin: 0 0 6px; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 8px; }
+.pwa-steps li { counter-increment: s; position: relative; padding-left: 36px; min-height: 26px; font-weight: 700; line-height: 1.5; }
+.pwa-steps li::before { content: counter(s); position: absolute; left: 0; top: 0; display: grid; place-items: center; width: 26px; height: 26px; background: var(--yellow); border: 2px solid var(--ink); font-family: var(--font-game); font-size: .95rem; }
+.pwa-share { display: inline-block; vertical-align: -6px; width: 22px; height: 22px; stroke: var(--blue-d); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.pwa-key { vertical-align: 1px; display: inline-grid; place-items: center; min-width: 24px; height: 24px; background: var(--ink); color: #fff; border-radius: 3px; }
+.pwa-cta { margin: 2px 0 6px; }
+.pwa-later { display: block; margin: 0 auto; background: none; border: 0; font-weight: 800; color: var(--ink-soft); text-decoration: underline; cursor: pointer; padding: 6px; }
+
 /* ---------------------------------------------------------------- admin */
 .admin .screen { padding-bottom: 40px; }
 .admin-topbar .logo { flex: 1; }

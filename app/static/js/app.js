@@ -58,6 +58,62 @@
     }
   });
 
+  // ---- Installation en PWA -------------------------------------------------
+  let deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault(); // on affiche notre propre bouton
+    deferredPrompt = e;
+    window.dispatchEvent(new Event("iodej:can-install"));
+  });
+
+  const HINT_KEY = "iodej:pwa-hint-dismissed";
+  const SNOOZE_DAYS = 7;
+
+  window.detectPlatform = () => {
+    const ua = navigator.userAgent || "";
+    const standalone = window.matchMedia("(display-mode: standalone)").matches
+      || window.matchMedia("(display-mode: fullscreen)").matches
+      || navigator.standalone === true;
+    // iPadOS se présente comme un Mac : on le reconnaît à l'écran tactile.
+    const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const android = /Android/i.test(ua);
+    const safari = ios && !/CriOS|FxiOS|EdgiOS|OPiOS|GSA|FBAN|FBAV|Instagram/i.test(ua);
+    return { os: ios ? "ios" : android ? "android" : "other", standalone, safari };
+  };
+
+  window.pwaHint = () => ({
+    open: false,
+    os: "other",
+    safari: false,
+    canPrompt: !!deferredPrompt,
+    init() {
+      const p = detectPlatform();
+      this.os = p.os;
+      this.safari = p.safari;
+      const snoozed = +localStorage.getItem(HINT_KEY) || 0;
+      const fresh = Date.now() - snoozed > SNOOZE_DAYS * 864e5;
+      // Pas pendant un swipe : l'encart masquerait les boutons.
+      const busy = !!document.getElementById("deck")?.querySelector(".card");
+      if (p.os !== "other" && !p.standalone && fresh && !busy) {
+        setTimeout(() => { this.open = true; }, 1200);
+      }
+      window.addEventListener("iodej:can-install", () => { this.canPrompt = true; });
+      window.addEventListener("appinstalled", () => { this.open = false; toast("Appli installée ! 🎉"); });
+    },
+    async install() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      this.canPrompt = false;
+      if (outcome === "accepted") this.open = false;
+    },
+    dismiss() {
+      localStorage.setItem(HINT_KEY, String(Date.now()));
+      this.open = false;
+    },
+  });
+
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
