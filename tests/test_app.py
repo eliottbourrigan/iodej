@@ -202,3 +202,16 @@ def test_access_code_format_and_case_insensitive(client, conn):
 def test_new_install_gets_short_access_code(conn):
     import re
     assert re.fullmatch(r"[A-Z0-9]{6}", db.get_setting(conn, "access_code"))
+
+
+def test_cache_headers(client, conn):
+    from app.web import ASSET_HASHES, static
+    url = static("css/app.css")
+    assert url == f"/static/css/app.css?v={ASSET_HASHES['css/app.css']}"
+    r = client.get(url)
+    assert r.status_code == 200 and "immutable" in r.headers["Cache-Control"]
+    assert "immutable" not in client.get("/static/css/app.css").headers["Cache-Control"]
+    page = client.get("/login")
+    assert page.headers["Cache-Control"] == "no-cache, private"
+    assert page.headers["X-Content-Type-Options"] == "nosniff"
+    assert url in page.text

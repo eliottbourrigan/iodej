@@ -15,20 +15,24 @@ DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."]
 
 
-def _static_version() -> str:
-    h = hashlib.sha1()
-    for p in sorted((config.BASE_DIR / "static").rglob("*")):
-        if p.is_file():
-            h.update(p.name.encode())
-            h.update(str(p.stat().st_mtime_ns).encode())
-    return h.hexdigest()[:10]
+def _asset_hashes() -> dict[str, str]:
+    """Empreinte du *contenu* de chaque fichier statique, calculée au démarrage.
+    Seuls les fichiers modifiés changent d'URL : le reste du cache navigateur survit
+    aux déploiements."""
+    root = config.BASE_DIR / "static"
+    return {
+        p.relative_to(root).as_posix(): hashlib.md5(p.read_bytes()).hexdigest()[:10]
+        for p in root.rglob("*") if p.is_file()
+    }
 
 
-STATIC_VERSION = _static_version()
+ASSET_HASHES = _asset_hashes()
 
 
 def static(path: str) -> str:
-    return f"/static/{path}?v={STATIC_VERSION}"
+    """URL versionnée : /static/css/app.css?v=<hash>, servie avec un cache d'un an."""
+    path = path.lstrip("/")
+    return f"/static/{path}?v={ASSET_HASHES.get(path, '0')}"
 
 
 def photo_url(name: str | None) -> str | None:

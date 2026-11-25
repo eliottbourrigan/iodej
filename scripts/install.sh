@@ -7,7 +7,7 @@
 #
 # Options :
 #   --domain <nom>     sous-domaine servi en HTTPS
-#   --port <port>      port interne (défaut 8000) — un port différent par projet
+#   --port <port>      port interne (défaut 8000 ; la 2e instance prend port+1) — 2 ports par projet
 #   --data-dir <dir>   base + photos (défaut : <projet>/data)
 #   --service <nom>    nom du service systemd et du site Caddy (défaut : iodej)
 #   --no-caddy         ne pas toucher à Caddy
@@ -42,6 +42,7 @@ APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_USER="$(stat -c %U "$APP_DIR")"
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 DATA_DIR="${DATA_DIR:-$APP_DIR/data}"
+PORT2=$((PORT + 1))   # seconde instance, pour les mises à jour sans coupure
 
 say() { printf '\n\033[1;35m▶ %s\033[0m\n' "$*"; }
 as_app() { sudo -u "$APP_USER" -H env IODEJ_DATA_DIR="$DATA_DIR" bash -c "$1"; }
@@ -69,11 +70,12 @@ as_app "cd '$APP_DIR' && '$UV' run --frozen --no-dev iodej init"
 # Les codes ne sont affichés qu'en session interactive (jamais dans les logs de CI).
 if [[ -t 1 ]]; then as_app "cd '$APP_DIR' && '$UV' run --frozen --no-dev iodej codes"; fi
 
-say "Service systemd ($SERVICE)"
+say "Services systemd ($SERVICE@$PORT et $SERVICE@$PORT2)"
 SECURE=0; [[ -n "$DOMAIN" ]] && SECURE=1
-cat > /etc/systemd/system/$SERVICE.service <<UNIT
+# Modèle d'unité : une instance par port (%i), pour les mises à jour sans coupure.
+cat > /etc/systemd/system/$SERVICE@.service <<UNIT
 [Unit]
-Description=$SERVICE (Iodej — On mange où ?)
+Description=$SERVICE (Iodej — On mange où ?) sur le port %i
 After=network.target
 
 [Service]
@@ -84,9 +86,11 @@ Environment=IODEJ_DATA_DIR=$DATA_DIR
 Environment=IODEJ_COOKIE_SECURE=$SECURE
 Environment=IODEJ_VAPID_SUB=${DOMAIN:+https://$DOMAIN}
 Environment=IODEJ_TZ=${IODEJ_TZ:-Europe/Paris}
-ExecStart=$UV run --frozen --no-dev iodej serve --host 127.0.0.1 --port $PORT
+ExecStart=$UV run --frozen --no-dev iodej serve --host 127.0.0.1 --port %i
 Restart=always
 RestartSec=3
+# Laisse le temps aux requêtes en cours de se terminer à l'arrêt.
+TimeoutStopSec=20
 
 [Install]
 WantedBy=multi-user.target
@@ -127,22 +131,6 @@ systemctl daemon-reload
 for KIND in first reminder; do systemctl enable --now $SERVICE-notify-$KIND.timer >/dev/null 2>&1; done
 systemctl list-timers "$SERVICE-notify-*" --no-pager | head -4 || true
 
-systemctl enable $SERVICE >/dev/null 2>&1
-systemctl stop $SERVICE 2>/dev/null || true
-
-# Le port doit être libre : sinon un autre programme (ex. un ./scripts/dev.sh oublié)
-# répondrait à la place du service et fausserait la vérification.
-port_owner() { ss -Hltnp "sport = :$PORT" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2; }
-for _ in $(seq 1 10); do [[ -z "$(port_owner)" ]] && break; sleep 1; done
-if [[ -n "$(port_owner)" ]]; then
-  PID="$(port_owner)"
-  echo "✖ Le port $PORT est déjà utilisé par un autre programme (pid $PID) :"
-  ps -o pid,user,cmd -p "$PID" | tail -n +2
-  echo "  Arrête-le (kill $PID), ou choisis un autre port avec --port."
-  exit 1
-fi
-systemctl start $SERVICE
-
 if [[ $WITH_CADDY -eq 1 ]]; then
   say "Reverse proxy Caddy"
   if ! command -v caddy >/dev/null; then
@@ -170,10 +158,20 @@ if [[ $WITH_CADDY -eq 1 ]]; then
   fi
 
   SITE="${DOMAIN:-:80}"
+  # Deux instances : Caddy sert la première disponible et bascule sur l'autre
+  # (nouvel essai transparent) pendant qu'on en redémarre une.
   cat > /etc/caddy/sites/$SERVICE.caddy <<CADDY
 $SITE {
     encode zstd gzip
-    reverse_proxy 127.0.0.1:$PORT
+    reverse_proxy 127.0.0.1:$PORT 127.0.0.1:$PORT2 {
+        lb_policy first
+        lb_try_duration 15s
+        lb_try_interval 250ms
+        fail_duration 10s
+        health_uri /healthz
+        health_interval 2s
+        health_timeout 2s
+    }
 }
 CADDY
   caddy validate --config "$MAIN" --adapter caddyfile >/dev/null
@@ -198,19 +196,41 @@ CADDY
   fi
 fi
 
-for _ in $(seq 1 20); do
-  curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break
-  sleep 1
+say "Mise à jour progressive (une instance à la fois)"
+port_owner() { ss -Hltnp "sport = :$1" 2>/dev/null | grep -o 'pid=[0-9]*' | head -1 | cut -d= -f2; }
+owned_by() { local pid; pid="$(port_owner "$1")"; [[ -n "$pid" ]] && grep -q "$2" "/proc/$pid/cgroup" 2>/dev/null; }
+healthy() { owned_by "$1" "$SERVICE@$1.service" && curl -fs -m 3 "http://127.0.0.1:$1/healthz" >/dev/null; }
+
+# L'ancienne instance unique (iodej.service, port $PORT) est remplacée au passage.
+LEGACY=0; [[ -f /etc/systemd/system/$SERVICE.service ]] && LEGACY=1
+
+for P in $PORT2 $PORT; do
+  if [[ $LEGACY -eq 1 && $P == "$PORT" ]]; then
+    systemctl disable --now $SERVICE >/dev/null 2>&1 || true
+    rm -f /etc/systemd/system/$SERVICE.service; systemctl daemon-reload
+  fi
+  systemctl enable $SERVICE@$P >/dev/null 2>&1
+  systemctl stop $SERVICE@$P 2>/dev/null || true
+  for _ in $(seq 1 10); do [[ -z "$(port_owner $P)" ]] && break; sleep 1; done
+  if [[ -n "$(port_owner $P)" ]]; then
+    PID="$(port_owner $P)"
+    echo "✖ Le port $P est déjà utilisé par un autre programme (pid $PID) :"
+    ps -o pid,user,cmd -p "$PID" | tail -n +2
+    echo "  Arrête-le (kill $PID), ou choisis un autre port avec --port."
+    exit 1
+  fi
+  systemctl start $SERVICE@$P
+  for _ in $(seq 1 30); do healthy $P && break; sleep 1; done
+  if ! healthy $P; then
+    echo "✖ L'instance $SERVICE@$P ne répond pas (l'autre instance continue de servir le site) :"
+    journalctl -u $SERVICE@$P -n 25 --no-pager || true
+    exit 1
+  fi
+  echo "  ✔ $SERVICE@$P à jour"
+  sleep 3  # le temps que Caddy la voie de nouveau en bonne santé
 done
-LISTENER="$(port_owner)"
-if curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null \
-   && [[ -n "$LISTENER" ]] && grep -q "$SERVICE.service" "/proc/$LISTENER/cgroup" 2>/dev/null; then
-  say "C'est en ligne !"
-else
-  echo "✖ Le service $SERVICE ne répond pas lui-même sur le port $PORT : journalctl -u $SERVICE -n 50"
-  journalctl -u $SERVICE -n 20 --no-pager || true
-  exit 1
-fi
+
+say "C'est en ligne !"
 if [[ -n "$DOMAIN" ]]; then echo "  URL     : https://$DOMAIN"; else echo "  URL     : http://<ip-du-vps>"; fi
 echo "  Admin   : …/admin"
-echo "  Logs    : journalctl -u $SERVICE -f"
+echo "  Logs    : journalctl -u '$SERVICE@*' -f"

@@ -53,7 +53,8 @@ Les **codes d'accès** sont générés au premier lancement et affichés à la f
 | Relancer le tirage du jour | `uv run iodej reset-day` |
 | Notification de test à tous les appareils abonnés | `uv run iodej notify test` |
 | Prochains rappels programmés | `systemctl list-timers 'iodej-notify-*'` |
-| Logs | `journalctl -u iodej -f` |
+| Logs (les 2 instances) | `journalctl -u 'iodej@*' -f` |
+| État des instances | `systemctl status 'iodej@*'` |
 
 ## Déploiement automatique (GitHub Actions)
 

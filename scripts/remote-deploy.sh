@@ -34,7 +34,7 @@ if ! id "$APP_USER" >/dev/null 2>&1; then
   useradd --create-home --home-dir "$HOME_DIR" --shell /usr/sbin/nologin "$APP_USER"
   FIRST=1
 fi
-[[ -f /etc/systemd/system/$SERVICE.service ]] || FIRST=1
+[[ -f /etc/systemd/system/$SERVICE@.service || -f /etc/systemd/system/$SERVICE.service ]] || FIRST=1
 mkdir -p "$APP_DIR" "$DATA_DIR"
 
 # Ancienne installation (git clone + install.sh) : on récupère sa base et ses photos.

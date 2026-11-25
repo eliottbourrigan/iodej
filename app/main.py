@@ -29,11 +29,33 @@ app.include_router(public.router)
 app.include_router(admin.router)
 
 
+ONE_YEAR = "public, max-age=31536000, immutable"
+
+
 @app.middleware("http")
-async def no_index(request: Request, call_next):
-    # Appli interne : on demande aux moteurs de recherche de ne rien indexer.
+async def http_headers(request: Request, call_next):
     response = await call_next(request)
-    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    path = request.url.path
+    h = response.headers
+    # --- cache
+    if path.startswith("/static/"):
+        # URL versionnée (?v=<hash du contenu>) : le fichier ne changera jamais.
+        h["Cache-Control"] = ONE_YEAR if "v" in request.query_params else "public, max-age=86400"
+    elif path.startswith("/uploads/") and response.status_code == 200:
+        h["Cache-Control"] = ONE_YEAR  # noms de fichiers aléatoires, jamais réécrits
+    elif "Cache-Control" not in h:
+        h["Cache-Control"] = "no-cache, private"  # pages personnelles : toujours revalider
+    if request.headers.get("HX-Request"):
+        h["Vary"] = ", ".join(filter(None, [h.get("Vary"), "HX-Request"]))
+    # --- sécurité (pas de CSP : Alpine.js a besoin d'unsafe-eval)
+    h["X-Content-Type-Options"] = "nosniff"
+    h["X-Frame-Options"] = "SAMEORIGIN"
+    h["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    h["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if config.COOKIE_SECURE:
+        h["Strict-Transport-Security"] = "max-age=31536000"
+    # Appli interne : on demande aux moteurs de recherche de ne rien indexer.
+    h["X-Robots-Tag"] = "noindex, nofollow"
     return response
 
 

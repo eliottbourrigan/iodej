@@ -1,6 +1,6 @@
 /* Service worker minimal : met en cache les assets statiques, réseau d'abord
    pour les pages (les données du jour doivent toujours être fraîches). */
-const CACHE = "iodej-v1";
+const CACHE = "iodej-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => {
@@ -14,7 +14,10 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
-  if (url.pathname.startsWith("/static/") || url.pathname.startsWith("/uploads/")) {
+  // Cache-first uniquement pour ce qui ne change jamais : assets versionnés et photos.
+  const immutable = (url.pathname.startsWith("/static/") && url.searchParams.has("v"))
+    || url.pathname.startsWith("/uploads/");
+  if (immutable) {
     e.respondWith(
       caches.open(CACHE).then(async (cache) => {
         const hit = await cache.match(e.request);
