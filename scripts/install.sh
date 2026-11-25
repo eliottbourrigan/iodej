@@ -211,6 +211,6 @@ else
   journalctl -u $SERVICE -n 20 --no-pager || true
   exit 1
 fi
-echo "  URL     : ${DOMAIN:+https://$DOMAIN}${DOMAIN:-http://<ip-du-vps>}"
+if [[ -n "$DOMAIN" ]]; then echo "  URL     : https://$DOMAIN"; else echo "  URL     : http://<ip-du-vps>"; fi
 echo "  Admin   : …/admin"
 echo "  Logs    : journalctl -u $SERVICE -f"
