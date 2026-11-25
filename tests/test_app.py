@@ -215,3 +215,14 @@ def test_cache_headers(client, conn):
     assert page.headers["Cache-Control"] == "no-cache, private"
     assert page.headers["X-Content-Type-Options"] == "nosniff"
     assert url in page.text
+
+
+def test_healthz_drain(client, monkeypatch):
+    from app import config
+    assert client.get("/healthz/lb").status_code == 200
+    monkeypatch.setenv("IODEJ_PORT", "8000")
+    (config.DATA_DIR / "drain-8000").touch()
+    assert client.get("/healthz/lb").status_code == 503
+    assert client.get("/healthz").status_code == 200  # vivante, juste hors trafic
+    monkeypatch.setenv("IODEJ_PORT", "8001")  # l'autre instance n'est pas concernée
+    assert client.get("/healthz/lb").status_code == 200

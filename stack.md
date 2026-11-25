@@ -58,7 +58,8 @@ tests/             conftest.py (DB temporaire par test) + test_*.py
 - **Pages** = routes HTML complètes ; **fragments** = `/partials/<nom>` ; erreurs d'auth → `HX-Redirect`
   si requête HTMX, sinon 303.
 - **Logique « du jour »** calculée à l'appel (fuseau `PREFIX_TZ`), pas de cron pour l'état.
-- `/healthz` (JSON) pour Caddy et le déploiement ; `/robots.txt` + `X-Robots-Tag: noindex` si appli interne.
+- `/healthz` (toujours 200 si vivant) pour le déploiement et la sonde ; `/healthz/lb` pour Caddy, qui répond
+  503 quand le fichier `data/drain-<port>` existe (mise hors trafic). `/robots.txt` + `X-Robots-Tag: noindex` si appli interne.
 - Auth légère possible : cookie longue durée contenant un *hash* du code partagé (changer le code = tout le
   monde déconnecté).
 
@@ -100,14 +101,14 @@ iodej.domaine.fr {
         lb_try_duration 15s        # …et bascule sur l'autre pendant un redémarrage
         lb_try_interval 250ms
         fail_duration 10s
-        health_uri /healthz
+        health_uri /healthz/lb     # 503 pendant la mise hors trafic
         health_interval 2s
     }
 }
 ```
 
 Unité systemd **modèle** `/etc/systemd/system/<p>@.service` (`%i` = port), `User=<p>`,
-`Environment=PREFIX_DATA_DIR=…`, `ExecStart=~/.local/bin/uv run --frozen --no-dev <p> serve --port %i`,
+`Environment=PREFIX_DATA_DIR=…`, `Environment=PREFIX_PORT=%i`, `ExecStart=~/.local/bin/uv run --frozen --no-dev <p> serve --port %i`,
 `Restart=always`, `TimeoutStopSec=20`. Tâches planifiées = paires `.service` (oneshot) + `.timer`
 (`OnCalendar=Mon..Fri *-*-* 11:30:00 Europe/Paris`, `Persistent=false`).
 
@@ -122,10 +123,11 @@ Unité systemd **modèle** `/etc/systemd/system/<p>@.service` (`%i` = port), `Us
    - `remote-deploy.sh` en root : crée l'utilisateur au 1er passage, **sauvegarde** la base, `rsync --delete`
      du code vers `/home/<p>/app` (`data/` exclu), puis `install.sh` (`--skip-system` après le 1er passage) ;
    - `install.sh` : `uv sync`, `init` (migrations), unités systemd, timers, site Caddy, **redémarrage progressif** :
-     pour chaque port (PORT+1 puis PORT) → stop → vérifie que le port est libre (sinon échoue en nommant le
-     programme) → start → attend `/healthz` *servi par cette unité* (vérif. du cgroup) → 3 s → suivant ;
+     pour chaque port (PORT+1 puis PORT) → **mise hors trafic** (`touch data/drain-<port>`, 5 s : Caddy bascule
+     tout sur l'autre instance) → stop → vérifie que le port est libre (sinon échoue en nommant le programme)
+     → start → attend `/healthz` *servi par cette unité* (vérif. du cgroup) → 3 s → suivant ;
    - **sonde** : `curl https://<domaine>/healthz` toutes les 200 ms pendant tout le déploiement →
-     « Disponibilité pendant le déploiement : N/N requêtes OK » dans le résumé du run ;
+     « Disponibilité pendant le déploiement : N/N requêtes OK » dans le résumé du run, échecs horodatés dans le log ;
    - vérification HTTPS finale (12 essais, timeouts courts, simple avertissement si échec).
 
 **Secrets du dépôt** : `VPS_HOST`, `VPS_SSH_KEY` (clé privée *entière*, lignes BEGIN/END comprises)
@@ -147,6 +149,8 @@ systemctl stop 'iodej@*' && cd /tmp && tar xzf /home/iodej/backups/iodej-<date>.
 
 - Un `dev.sh` oublié ou un **nginx** d'un ancien projet occupe le port → le script échoue et nomme le coupable.
 - Ne jamais croire un `/healthz` local sans vérifier **quel processus** répond (cgroup de l'unité).
+- Sans mise hors trafic, un redémarrage perd encore ~1 requête sur 30 (Caddy route vers l'instance qui s'arrête) ;
+  avec : 0 sur 3 700 en test local. La santé « load balancer » doit être distincte de la santé publique.
 - Tous les `curl` de CI ont `--connect-timeout`/`-m` ; chaque étape a un `timeout-minutes`.
 - Codes et secrets jamais dans les logs de CI ; pas de mot de passe root dans les secrets si une clé suffit.
 - Migrations testées sur une copie de l'ancien schéma avant de pousser.

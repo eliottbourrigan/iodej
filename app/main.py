@@ -1,4 +1,5 @@
 """Point d'entrée FastAPI."""
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -91,4 +92,15 @@ async def manifest():
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz():
+    return {"ok": True}
+
+
+@app.get("/healthz/lb", include_in_schema=False)
+async def healthz_lb():
+    """Santé vue par Caddy. Mise hors trafic avant un redémarrage : install.sh crée
+    data/drain-<port>, Caddy voit l'instance indisponible et sert tout depuis l'autre,
+    puis on l'arrête sans perdre de requête."""
+    port = os.environ.get("IODEJ_PORT")
+    if port and (config.DATA_DIR / f"drain-{port}").exists():
+        return Response('{"ok":false,"draining":true}', status_code=503, media_type="application/json")
     return {"ok": True}

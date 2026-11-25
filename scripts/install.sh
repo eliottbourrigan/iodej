@@ -86,6 +86,7 @@ Environment=IODEJ_DATA_DIR=$DATA_DIR
 Environment=IODEJ_COOKIE_SECURE=$SECURE
 Environment=IODEJ_VAPID_SUB=${DOMAIN:+https://$DOMAIN}
 Environment=IODEJ_TZ=${IODEJ_TZ:-Europe/Paris}
+Environment=IODEJ_PORT=%i
 ExecStart=$UV run --frozen --no-dev iodej serve --host 127.0.0.1 --port %i
 Restart=always
 RestartSec=3
@@ -168,7 +169,7 @@ $SITE {
         lb_try_duration 15s
         lb_try_interval 250ms
         fail_duration 10s
-        health_uri /healthz
+        health_uri /healthz/lb
         health_interval 2s
         health_timeout 2s
     }
@@ -210,7 +211,14 @@ for P in $PORT2 $PORT; do
     rm -f /etc/systemd/system/$SERVICE.service; systemctl daemon-reload
   fi
   systemctl enable $SERVICE@$P >/dev/null 2>&1
+  if systemctl is-active --quiet $SERVICE@$P; then
+    # Mise hors trafic : /healthz répond 503, Caddy bascule sur l'autre instance
+    # (health_interval 2s), puis on arrête proprement.
+    install -o "$APP_USER" /dev/null "$DATA_DIR/drain-$P"
+    sleep 5
+  fi
   systemctl stop $SERVICE@$P 2>/dev/null || true
+  rm -f "$DATA_DIR/drain-$P"
   for _ in $(seq 1 10); do [[ -z "$(port_owner $P)" ]] && break; sleep 1; done
   if [[ -n "$(port_owner $P)" ]]; then
     PID="$(port_owner $P)"

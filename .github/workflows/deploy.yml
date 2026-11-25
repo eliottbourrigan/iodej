@@ -100,13 +100,14 @@ jobs:
           TARGET: ${{ secrets.VPS_USER || 'root' }}@${{ secrets.VPS_HOST }}
         run: |
           # Sonde pendant le déploiement : une requête toutes les 200 ms sur le site public.
-          ( while true; do curl -s -o /dev/null -m 5 -w "%{http_code}\n" "https://$DOMAIN/healthz" || true; sleep 0.2; done ) > probe.log &
+          ( while true; do echo "$(date +%T.%3N) $(curl -s -o /dev/null -m 5 -w '%{http_code} %{time_total}s' "https://$DOMAIN/healthz" || true)"; sleep 0.2; done ) > probe.log &
           PROBE=$!
           $SSH_CMD "$TARGET" \
             "SUDO=; [ \$(id -u) -eq 0 ] || SUDO='sudo -n'; \$SUDO bash $RELEASE/scripts/remote-deploy.sh --domain $DOMAIN --port $APP_PORT"
           sleep 2; kill $PROBE || true
-          TOTAL=$(wc -l < probe.log); KO=$(grep -vc '^200$' probe.log || true)
+          TOTAL=$(wc -l < probe.log); KO=$(grep -vc ' 200 ' probe.log || true)
           echo "Sonde pendant le déploiement : $TOTAL requêtes, $KO en échec"
+          grep -v ' 200 ' probe.log | sed 's/^/  échec : /' || true
           echo "::notice::Disponibilité pendant le déploiement : $((TOTAL-KO))/$TOTAL requêtes OK"
 
       - name: Vérifier que le site répond
