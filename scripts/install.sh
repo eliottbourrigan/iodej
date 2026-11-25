@@ -141,8 +141,22 @@ $SITE {
 }
 CADDY
   caddy validate --config "$MAIN" --adapter caddyfile >/dev/null
+
+  # Les ports web doivent être à Caddy (pas à un nginx/apache d'un ancien projet).
+  for WEBPORT in 80 443; do
+    OWNER="$(ss -Hltnp "sport = :$WEBPORT" 2>/dev/null | grep -o '(("[^"]*"' | head -1 | tr -d '("')"
+    if [[ -n "$OWNER" && "$OWNER" != "caddy" ]]; then
+      echo "✖ Le port $WEBPORT est occupé par « $OWNER » : Caddy ne peut pas servir le site."
+      echo "  Si c'est un ancien projet : systemctl disable --now $OWNER   puis relance le déploiement."
+      exit 1
+    fi
+  done
+
   systemctl enable caddy >/dev/null 2>&1
-  systemctl reload caddy || systemctl restart caddy
+  systemctl reload caddy 2>/dev/null || systemctl restart caddy
+  if ! systemctl is-active --quiet caddy; then
+    echo "✖ Caddy ne tourne pas :"; journalctl -u caddy -n 20 --no-pager; exit 1
+  fi
   if command -v ufw >/dev/null && ufw status | grep -q "Status: active"; then
     ufw allow 80/tcp >/dev/null; ufw allow 443/tcp >/dev/null
   fi
