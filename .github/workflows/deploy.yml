@@ -55,7 +55,21 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           ssh-keyscan -p "${VPS_PORT:-22}" -T 15 "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           if [ -n "$VPS_SSH_KEY" ]; then
-            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+            # Tolère les copier-coller abîmés : retours chariot Windows, clé collée sur une ligne.
+            python3 - > ~/.ssh/deploy_key <<'PY'
+          import os, re, textwrap
+          k = os.environ["VPS_SSH_KEY"].replace("\r", "").strip()
+          m = re.match(r"(-----BEGIN [A-Z ]+-----)(.*?)(-----END [A-Z ]+-----)", k, re.S)
+          if m:
+              body = "".join(m.group(2).split())
+              k = "\n".join([m.group(1), *textwrap.wrap(body, 70), m.group(3)])
+          print(k)
+          PY
+            chmod 600 ~/.ssh/deploy_key
+            if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+              echo "::error::VPS_SSH_KEY illisible. Colle la clé privée entière, lignes BEGIN/END comprises, telle qu'affichée par 'cat' (et pas la .pub)."
+              exit 1
+            fi
             echo "SSH_CMD=ssh -i $HOME/.ssh/deploy_key -p ${VPS_PORT:-22} -o BatchMode=yes" >> "$GITHUB_ENV"
           elif [ -n "$VPS_PASSWORD" ]; then
             sudo apt-get install -y -qq sshpass >/dev/null
